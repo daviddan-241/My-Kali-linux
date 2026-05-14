@@ -20,16 +20,17 @@ const io     = new Server(server, {
 app.use(cors());
 app.use(express.static(path.join(__dirname, "public")));
 
-// Write a bash init file that sets the real Kali two-line PS1
+// Write a bash init file that sets the real Kali two-line prompt
 const INIT_FILE = path.join(os.tmpdir(), "kali-init.sh");
 fs.writeFileSync(INIT_FILE, `
-# Source system and user rc files if they exist
+# Source system profiles if they exist
 [ -f /etc/bash.bashrc ] && source /etc/bash.bashrc
-[ -f ~/.bashrc ] && source ~/.bashrc
+[ -f ~/.bashrc ] && source ~/.bashrc 2>/dev/null || true
 
 # Real Kali Linux two-line prompt
 export PS1='\\[\\033[1;32m\\]\\u@\\h\\[\\033[0m\\]:\\[\\033[1;34m\\]\\w\\[\\033[0m\\]\\$ '
 export TERM=xterm-256color
+export COLORTERM=truecolor
 `);
 fs.chmodSync(INIT_FILE, 0o755);
 
@@ -54,9 +55,9 @@ io.on("connection", (socket) => {
     socket.disconnect();
   });
 
-  socket.on("input",  (d)        => { try { shell.write(d); }           catch (e) {} });
+  socket.on("input",  (d)            => { try { shell.write(d); }            catch (e) {} });
   socket.on("resize", ({ cols, rows }) => { try { shell.resize(cols, rows); } catch (e) {} });
-  socket.on("disconnect", ()     => { try { shell.kill(); }              catch (e) {} });
+  socket.on("disconnect", ()          => { try { shell.kill(); }              catch (e) {} });
 });
 
 const PORT = process.env.PORT || 5000;
