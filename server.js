@@ -20,21 +20,36 @@ const io     = new Server(server, {
 app.use(cors());
 app.use(express.static(path.join(__dirname, "public")));
 
-// Write a bash init file — Kali prompt + Termux-style welcome banner
 const INIT_FILE = path.join(os.tmpdir(), "kali-init.sh");
 fs.writeFileSync(INIT_FILE, `
 # Source system profiles silently
 [ -f /etc/bash.bashrc ] && source /etc/bash.bashrc 2>/dev/null || true
 
-# Override hostname to kali and set root-style prompt
+# Fix locale (suppresses perl warnings on apt operations)
+export LANG=en_US.UTF-8
+export LC_ALL=C.UTF-8
+export LANGUAGE=en_US.UTF-8
+
 export HOSTNAME=kali
 export TERM=xterm-256color
 export COLORTERM=truecolor
 
-# Kali Linux colored prompt:  root@kali:~#
+# Kali colored prompt: root@kali:~#
 export PS1='\\[\\033[1;32m\\]root@kali\\[\\033[0m\\]:\\[\\033[1;34m\\]\\w\\[\\033[0m\\]# '
 
-# ── Welcome banner (Termux-style) ──────────────────────────────
+# ── ASCII Banner ─────────────────────────────────────
+printf '\\033[1;32m'
+cat << 'KALI_ART'
+      ___     ___
+     (   )   (   )
+    __|_|_____|_|__
+   /               \\
+  |   KALI LINUX   |
+  |    Terminal    |
+   \\             /
+    '-----------'
+KALI_ART
+printf '\\033[0m\\n'
 echo -e "\\033[1;32mWelcome to Kali Linux Terminal!\\033[0m"
 echo ""
 echo -e " \\033[1;37m*\\033[0m Docs:    https://www.kali.org/docs/"
@@ -60,6 +75,8 @@ io.on("connection", (socket) => {
       TERM:      "xterm-256color",
       COLORTERM: "truecolor",
       LANG:      "en_US.UTF-8",
+      LC_ALL:    "C.UTF-8",
+      LANGUAGE:  "en_US.UTF-8",
     },
   });
 
