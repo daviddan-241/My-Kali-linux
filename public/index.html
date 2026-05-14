@@ -6,6 +6,7 @@
 <meta name="mobile-web-app-capable" content="yes"/>
 <meta name="apple-mobile-web-app-capable" content="yes"/>
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+<meta name="theme-color" content="#000"/>
 <title>Kali Terminal</title>
 <link rel="stylesheet" href="https://unpkg.com/xterm@5.3.0/css/xterm.css"/>
 <script src="https://unpkg.com/xterm@5.3.0/lib/xterm.js"></script>
@@ -13,7 +14,6 @@
 <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
-
 html,body{
   width:100%;height:100%;
   background:#000;overflow:hidden;
@@ -21,260 +21,286 @@ html,body{
   -webkit-tap-highlight-color:transparent;
 }
 
+/* ─── App shell: position:fixed + JS height keeps keybar above keyboard ─── */
 #app{
+  position:fixed;
+  top:0;left:0;right:0;
+  /* height set by resizeToVV() */
   display:flex;flex-direction:column;
-  width:100%;height:100vh;height:100dvh;
-  padding-top:env(safe-area-inset-top,0px);
+  background:#000;
 }
 
-/* ── Terminal area ── */
+/* ─── Tab bar ─── */
+#tabbar{
+  display:flex;align-items:stretch;
+  height:38px;flex-shrink:0;
+  background:#0c0d0e;
+  border-bottom:1px solid #1a1a1a;
+  overflow:hidden;
+}
+#menubtn{
+  flex-shrink:0;width:42px;
+  display:flex;align-items:center;justify-content:center;
+  color:#555;font-size:19px;
+  border-right:1px solid #1a1a1a;
+  cursor:pointer;touch-action:manipulation;
+  -webkit-user-select:none;user-select:none;
+}
+#tabs{
+  flex:1;display:flex;align-items:stretch;
+  overflow-x:auto;overflow-y:hidden;
+  -webkit-overflow-scrolling:touch;
+  scrollbar-width:none;
+}
+#tabs::-webkit-scrollbar{display:none;}
+.tab{
+  flex-shrink:0;display:flex;align-items:center;gap:5px;
+  padding:0 10px;min-width:74px;max-width:124px;
+  border-right:1px solid #181818;position:relative;
+  cursor:pointer;touch-action:manipulation;
+  -webkit-user-select:none;user-select:none;
+}
+.tab.cur::after{
+  content:'';position:absolute;bottom:0;left:0;right:0;height:2px;
+  background:#55ff55;
+}
+.tdot{width:6px;height:6px;border-radius:50%;background:#333;flex-shrink:0;}
+.tab.live .tdot{background:#55ff55;box-shadow:0 0 4px #55ff55;}
+.tab.dead .tdot{background:#ff5555;}
+.tname{
+  flex:1;font-size:11px;font-family:'Courier New',monospace;
+  color:#555;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+}
+.tab.cur .tname{color:#55ff55;}
+.tab.unread .tname::before{content:'● ';color:#f1fa8c;font-size:8px;}
+.tx{font-size:12px;color:#2a2a2a;padding:3px 2px;flex-shrink:0;}
+#addtab{
+  flex-shrink:0;width:36px;
+  display:flex;align-items:center;justify-content:center;
+  color:#444;font-size:20px;line-height:1;
+  border-left:1px solid #1a1a1a;
+  cursor:pointer;touch-action:manipulation;
+  -webkit-user-select:none;user-select:none;
+}
+
+/* ─── Terminal ─── */
 #term-area{
-  flex:1;position:relative;overflow:hidden;background:#000;
+  flex:1;position:relative;overflow:hidden;background:#000;min-height:0;
 }
 #term-area::before{
   content:'';position:absolute;inset:0;
   background:url('kali-bg.jpeg') center/cover no-repeat;
-  opacity:.08;pointer-events:none;z-index:0;
+  opacity:.06;pointer-events:none;z-index:0;
 }
-#tinner{
-  position:absolute;inset:0;padding:2px 4px;z-index:1;
-}
-.xterm{height:100%!important;}
-.xterm-viewport{background:transparent!important;}
+#tinner{position:absolute;inset:0;padding:2px 4px;z-index:1;}
+.xterm,.xterm-viewport,.xterm-screen{height:100%!important;}
+.xterm-viewport{background:transparent!important;overflow-y:hidden!important;}
 
-/*
- * iOS KEYBOARD OVERLAY — opacity:0 invisible textarea covers the entire
- * terminal. Tapping it opens keyboard naturally (no JS focus() needed).
- * font-size:16px stops iOS from zooming.
- */
+/* Transparent textarea — captures mobile keyboard input */
 #kb{
-  position:absolute;top:0;left:0;width:100%;height:100%;
-  z-index:10;opacity:0;
+  position:absolute;inset:0;z-index:10;opacity:0;
   font-size:16px;resize:none;
   background:transparent;border:none;outline:none;padding:0;
   color:transparent;caret-color:transparent;
   -webkit-appearance:none;
+  /* allow vertical pan on terminal scroll */
+  touch-action:pan-y;
 }
 
-/* ── Scroll-to-bottom button ── */
-#go-bottom{
-  position:absolute;bottom:10px;right:10px;
-  width:30px;height:30px;
-  background:rgba(0,255,65,0.12);
-  border:1px solid rgba(0,255,65,0.3);
-  border-radius:50%;
-  color:#55ff55;font-size:16px;font-weight:700;
-  display:none;align-items:center;justify-content:center;
-  z-index:11;cursor:pointer;
-  -webkit-user-select:none;user-select:none;
-  touch-action:manipulation;
-  transition:opacity .2s;
+/* Scroll-to-bottom pill */
+#gobot{
+  position:absolute;right:8px;bottom:8px;
+  width:30px;height:30px;border-radius:50%;
+  background:rgba(0,0,0,.8);border:1px solid rgba(85,255,85,.4);
+  color:#55ff55;font-size:13px;
+  align-items:center;justify-content:center;display:none;
+  z-index:12;cursor:pointer;touch-action:manipulation;
 }
-#go-bottom.show{display:flex;}
+#gobot.show{display:flex;}
 
-/* ── Key row — fills full width, no scroll ── */
+/* Live badge */
+#badge{
+  position:absolute;top:5px;right:8px;z-index:12;
+  font-size:9px;letter-spacing:1px;font-family:'Courier New',monospace;
+  pointer-events:none;
+}
+#badge.on{color:#44aa44;}
+#badge.off{color:#ff4444;}
+
+/* ─── Key bar — always visible above keyboard via JS ─── */
 #keybar{
   display:flex;align-items:stretch;
-  height:46px;flex-shrink:0;
-  background:#1a1c1e;border-top:1px solid #2a2a2a;
-  padding:4px 3px;gap:2px;
-  padding-bottom:max(4px,env(safe-area-inset-bottom,4px));
+  height:44px;flex-shrink:0;
+  background:#0c0d0e;
+  border-top:1px solid #1a1a1a;
+  padding:3px 2px;gap:2px;
+  /* safe area applied only when keyboard is closed */
+  padding-bottom:max(3px, env(safe-area-inset-bottom, 3px));
 }
-
 .k{
-  display:flex;align-items:center;justify-content:center;
   flex:1;min-width:0;
-  background:#2d3035;border:none;border-radius:4px;
-  font-size:11px;font-weight:700;font-family:'Courier New',monospace;
-  color:#ccc;cursor:pointer;
+  display:flex;align-items:center;justify-content:center;
+  background:#181a1c;border:none;border-radius:4px;
+  font-size:11px;font-weight:700;
+  font-family:'Courier New',monospace;
+  color:#999;
+  touch-action:manipulation;cursor:pointer;
   -webkit-user-select:none;user-select:none;
-  touch-action:manipulation;
   -webkit-tap-highlight-color:transparent;
-  transition:background .1s;
 }
-.k.on,.k:active{background:#454a50;color:#fff;}
-.k.mod{color:#aac8ff;background:#23263a;}
-.k.mod.on,.k.mod:active{background:#2e3660;color:#cce0ff;outline:1px solid #4466cc;}
+.k.mod{color:#7ab4ff;background:#15192a;}
+.k.mod.on{background:#222f55;color:#b8d4ff;box-shadow:0 0 0 1px #3355bb inset;}
+.k.flash{background:#2e3338;color:#fff;}
 
-/* ── Sessions drawer ── */
-#mask{display:none;position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:40;}
-#mask.open{display:block;}
-#drawer{
-  position:fixed;top:0;left:0;bottom:0;width:260px;
-  background:#0f1011;border-right:1px solid #222;
-  z-index:41;transform:translateX(-100%);
-  transition:transform .24s cubic-bezier(.4,0,.2,1);
+/* ─── Side menu ─── */
+#mmask{display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:80;}
+#mmask.open{display:block;}
+#menu{
+  position:fixed;top:0;right:0;bottom:0;width:256px;
+  background:#0a0b0c;border-left:1px solid #1a1a1a;
+  z-index:81;transform:translateX(110%);
+  transition:transform .2s ease;
   display:flex;flex-direction:column;
+  overflow-y:auto;
   padding-top:env(safe-area-inset-top,0px);
+  padding-bottom:env(safe-area-inset-bottom,0px);
 }
-#drawer.open{transform:translateX(0);}
-#drawer-head{
-  padding:18px 16px 10px;border-bottom:1px solid #1e1e1e;
-  font-size:9px;letter-spacing:2.5px;text-transform:uppercase;color:#3a3a3a;
-  font-family:'Courier New',monospace;
+#menu.open{transform:translateX(0);}
+#mhead{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:14px 16px;border-bottom:1px solid #161616;flex-shrink:0;
 }
-#sess-list{flex:1;overflow-y:auto;padding:4px 0;-webkit-overflow-scrolling:touch;}
-.si{
-  display:flex;align-items:center;gap:10px;padding:13px 16px;cursor:pointer;
-  border-left:3px solid transparent;
+#mhead span:first-child{
+  font-size:9px;letter-spacing:2.5px;text-transform:uppercase;
+  color:#333;font-family:'Courier New',monospace;
+}
+#mclose{
+  color:#333;font-size:18px;cursor:pointer;padding:2px 6px;
+  touch-action:manipulation;-webkit-user-select:none;user-select:none;
+}
+.msec{
+  padding:10px 14px 3px;font-size:9px;letter-spacing:2px;
+  text-transform:uppercase;color:#242424;font-family:'Courier New',monospace;
+}
+.mrow{
+  display:flex;align-items:center;gap:10px;
+  padding:13px 16px;border-bottom:1px solid #111;
+  cursor:pointer;touch-action:manipulation;
   -webkit-user-select:none;user-select:none;
-  transition:background .12s;
 }
-.si.active-touch{background:#1a1a1a;}
-.si.cur{background:#131413;border-left-color:#55ff55;}
-.si .dot{width:7px;height:7px;border-radius:50%;background:#2a2a2a;flex-shrink:0;}
-.si.cur .dot,.si .dot.on{background:#55ff55;box-shadow:0 0 5px #55ff55;}
-.si .dot.dead{background:#ff5555;}
-.si .nm{
-  flex:1;font-size:13px;color:#888;font-family:'Courier New',monospace;
-  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+.mrow:active{background:#111;}
+.mi{font-size:15px;width:22px;text-align:center;flex-shrink:0;}
+.ml{flex:1;font-size:13px;color:#777;font-family:'Courier New',monospace;}
+.fsrow{display:flex;align-items:center;gap:8px;}
+.fsbtn{
+  width:32px;height:32px;display:flex;align-items:center;justify-content:center;
+  background:#181818;border:1px solid #222;border-radius:4px;
+  font-size:18px;color:#666;cursor:pointer;
+  touch-action:manipulation;-webkit-user-select:none;user-select:none;
 }
-.si.cur .nm{color:#55ff55;}
-.si .cx{font-size:15px;color:#2a2a2a;padding:4px 6px;border-radius:3px;}
-.si .cx:active{color:#ff5555;background:#1a0000;}
-#btn-new{
-  margin:10px 12px 12px;padding:12px;
-  background:#071507;border:1px dashed #1a3d1a;border-radius:5px;
-  text-align:center;font-size:11px;font-weight:700;letter-spacing:1px;
-  text-transform:uppercase;color:#44cc44;cursor:pointer;
-  font-family:'Courier New',monospace;
-  -webkit-user-select:none;user-select:none;touch-action:manipulation;
-}
-#btn-new:active{background:#0c1f0c;}
-#drawer-settings{
-  padding:13px 16px;border-top:1px solid #1a1a1a;
-  font-size:12px;color:#444;font-family:'Courier New',monospace;
-  cursor:pointer;-webkit-user-select:none;user-select:none;flex-shrink:0;
-}
-#drawer-settings:active{color:#888;}
-
-/* ── Settings sheet ── */
-#smask{display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:50;}
-#smask.open{display:block;}
-#ssheet{
-  position:fixed;bottom:0;left:0;right:0;background:#0f1011;
-  border-top:1px solid #222;border-radius:14px 14px 0 0;
-  z-index:51;transform:translateY(100%);
-  transition:transform .28s cubic-bezier(.4,0,.2,1);
-  padding-bottom:env(safe-area-inset-bottom,0);
-}
-#ssheet.open{transform:translateY(0);}
-.sh{width:36px;height:4px;background:#222;border-radius:2px;margin:12px auto 4px;}
-.stitle{
-  text-align:center;font-size:9px;letter-spacing:2.5px;text-transform:uppercase;
-  color:#333;padding:4px 0 12px;font-family:'Courier New',monospace;
-}
-.srow{display:flex;align-items:center;padding:13px 18px;border-top:1px solid #1a1a1a;gap:10px;}
-.slbl{flex:1;font-size:13px;color:#888;font-family:'Courier New',monospace;}
-.sbtn{
-  width:38px;height:38px;display:flex;align-items:center;justify-content:center;
-  background:#1c1c1c;border:1px solid #2a2a2a;border-radius:5px;
-  font-size:20px;color:#777;cursor:pointer;
-  -webkit-user-select:none;user-select:none;touch-action:manipulation;
-}
-.sbtn:active{background:#252525;color:#55ff55;}
 #fsval{
-  width:32px;text-align:center;font-size:14px;font-weight:700;color:#ccc;
-  font-family:'Courier New',monospace;
+  width:26px;text-align:center;font-size:13px;font-weight:700;
+  color:#ccc;font-family:'Courier New',monospace;
 }
+.themes{display:flex;gap:6px;flex-wrap:wrap;padding:8px 16px 14px;}
 .topt{
-  padding:7px 13px;background:#181818;border:1px solid #252525;border-radius:16px;
-  font-size:11px;font-weight:700;color:#444;cursor:pointer;
-  font-family:'Courier New',monospace;
-  -webkit-user-select:none;user-select:none;touch-action:manipulation;
-}
-.topt.on{background:#081808;border-color:#245524;color:#55ff55;}
-.topt:active{background:#141414;}
-#sclose{
-  text-align:center;padding:15px;font-size:12px;letter-spacing:1px;
-  text-transform:uppercase;color:#333;cursor:pointer;
-  font-family:'Courier New',monospace;border-top:1px solid #1a1a1a;
+  padding:5px 12px;background:#111;border:1px solid #1e1e1e;border-radius:14px;
+  font-size:10px;font-weight:700;color:#444;cursor:pointer;
+  font-family:'Courier New',monospace;touch-action:manipulation;
   -webkit-user-select:none;user-select:none;
 }
-#sclose:active{color:#666;}
+.topt.on{background:#071507;border-color:#225222;color:#55ff55;}
+#notifbtn{
+  margin:8px 14px;padding:9px 12px;
+  background:#091009;border:1px solid #1a2e1a;border-radius:5px;
+  text-align:center;font-size:11px;color:#448844;
+  font-family:'Courier New',monospace;cursor:pointer;
+  touch-action:manipulation;-webkit-user-select:none;user-select:none;
+  display:none;
+}
+#notifbtn.show{display:block;}
 </style>
 </head>
 <body>
 <div id="app">
+
+  <!-- Tab bar -->
+  <div id="tabbar">
+    <div id="menubtn">&#9776;</div>
+    <div id="tabs"></div>
+    <div id="addtab">+</div>
+  </div>
+
+  <!-- Terminal area -->
   <div id="term-area">
     <div id="tinner"></div>
-    <!--
-      iOS keyboard overlay. User taps terminal area → taps THIS textarea
-      → iOS keyboard opens (no programmatic focus needed).
-      opacity:0 keeps it invisible. font-size:16px stops zoom.
-    -->
     <textarea id="kb"
       autocomplete="off" autocorrect="off"
       autocapitalize="none" spellcheck="false"
       inputmode="text" enterkeyhint="send"
       tabindex="0" aria-hidden="true"></textarea>
-    <!-- Scroll-to-bottom button — appears when user scrolls up -->
-    <div id="go-bottom" title="Scroll to bottom">&#x25BC;</div>
+    <div id="gobot">&#x25BC;</div>
+    <div id="badge"></div>
   </div>
 
-  <!-- Key row — fills full screen width equally -->
+  <!-- Key bar — always above keyboard -->
   <div id="keybar">
-    <div class="k"     id="k-esc">ESC</div>
-    <div class="k"     id="k-tab">&#8677;</div>
-    <div class="k mod" id="k-ctrl">CTRL</div>
-    <div class="k mod" id="k-alt">ALT</div>
-    <div class="k"     id="k-dash">&#8212;</div>
-    <div class="k"     id="k-pipe">|</div>
-    <div class="k"     id="k-up">&#x25B2;</div>
-    <div class="k"     id="k-down">&#x25BC;</div>
-    <div class="k"     id="k-left">&#x25C4;</div>
-    <div class="k"     id="k-right">&#x25BA;</div>
+    <div class="k mod" id="kctrl">CTL</div>
+    <div class="k mod" id="kalt">ALT</div>
+    <div class="k"     id="kesc">ESC</div>
+    <div class="k"     id="ktab">TAB</div>
+    <div class="k"     id="kup">&#x25B2;</div>
+    <div class="k"     id="kdown">&#x25BC;</div>
+    <div class="k"     id="kleft">&#x25C4;</div>
+    <div class="k"     id="kright">&#x25BA;</div>
+    <div class="k"     id="kpipe">|</div>
+    <div class="k"     id="kdash">-</div>
   </div>
 </div>
 
-<!-- Sessions drawer -->
-<div id="mask"></div>
-<div id="drawer">
-  <div id="drawer-head">Sessions</div>
-  <div id="sess-list"></div>
-  <div id="btn-new">&#xFF0B;&nbsp; New Session</div>
-  <div id="drawer-settings">&#9881;&nbsp; Settings</div>
-</div>
-
-<!-- Settings sheet -->
-<div id="smask"></div>
-<div id="ssheet">
-  <div class="sh"></div>
-  <div class="stitle">Settings</div>
-  <div class="srow">
-    <span class="slbl">Font Size</span>
-    <div class="sbtn" id="fsm">&#8722;</div>
-    <div id="fsval">14</div>
-    <div class="sbtn" id="fsp">&#xFF0B;</div>
+<!-- Side menu -->
+<div id="mmask"></div>
+<div id="menu">
+  <div id="mhead">
+    <span>Kali Terminal</span>
+    <span id="mclose">&#x2715;</span>
   </div>
-  <div class="srow">
-    <span class="slbl">Theme</span>
-    <div style="display:flex;gap:8px;flex-wrap:wrap;">
-      <div class="topt on" data-t="kali">Kali</div>
-      <div class="topt" data-t="matrix">Matrix</div>
-      <div class="topt" data-t="dracula">Dracula</div>
+  <div id="notifbtn">&#x1F514; Enable notifications</div>
+  <div class="msec">Display</div>
+  <div class="mrow" style="cursor:default">
+    <span class="mi">A</span>
+    <span class="ml">Font Size</span>
+    <div class="fsrow">
+      <div class="fsbtn" id="fsm">&#8722;</div>
+      <div id="fsval">14</div>
+      <div class="fsbtn" id="fsp">+</div>
     </div>
   </div>
-  <div id="sclose">Close</div>
+  <div class="themes">
+    <div class="topt" data-t="kali">Kali</div>
+    <div class="topt" data-t="matrix">Matrix</div>
+    <div class="topt" data-t="dracula">Dracula</div>
+  </div>
+  <div class="msec">Session</div>
+  <div class="mrow" id="mnew"><span class="mi">+</span><span class="ml">New Terminal</span></div>
+  <div class="mrow" id="mclear"><span class="mi">&#x239A;</span><span class="ml">Clear Screen</span></div>
 </div>
 
 <script>
 'use strict';
 
-/* ── Guard: alert if xterm didn't load ── */
 if (typeof Terminal === 'undefined') {
   document.getElementById('tinner').innerHTML =
-    '<div style="color:#ff5555;padding:16px;font-family:monospace;font-size:14px">' +
-    'Error: xterm.js failed to load.<br>Check internet connection and reload.</div>';
-  throw new Error('xterm.js not loaded');
+    '<p style="color:#f55;padding:16px;font-family:monospace">xterm.js failed — check connection and reload.</p>';
+  throw new Error('xterm missing');
 }
 
-/* ── Themes ── */
+/* ─── Themes ─── */
 var THEMES = {
   kali:{
-    background:'rgba(0,0,0,0.9)',foreground:'#f8f8f2',
+    background:'rgba(0,0,0,0.92)',foreground:'#f8f8f2',
     cursor:'#00ff41',cursorAccent:'#000',
-    selectionBackground:'rgba(80,200,80,.2)',
+    selectionBackground:'rgba(85,255,85,0.25)',
     black:'#21222c',red:'#ff5555',green:'#55ff55',yellow:'#f1fa8c',
     blue:'#6272a4',magenta:'#ff79c6',cyan:'#8be9fd',white:'#f8f8f2',
     brightBlack:'#6272a4',brightRed:'#ff6e6e',brightGreen:'#69ff47',
@@ -282,9 +308,9 @@ var THEMES = {
     brightCyan:'#a4ffff',brightWhite:'#ffffff',
   },
   matrix:{
-    background:'rgba(0,0,0,0.95)',foreground:'#00ff41',
+    background:'rgba(0,0,0,0.96)',foreground:'#00ff41',
     cursor:'#00ff41',cursorAccent:'#000',
-    selectionBackground:'rgba(0,255,65,.2)',
+    selectionBackground:'rgba(0,255,65,0.2)',
     black:'#0d0d0d',red:'#cc0000',green:'#00ff41',yellow:'#aaff00',
     blue:'#007700',magenta:'#00aa44',cyan:'#00ffaa',white:'#aaffaa',
     brightBlack:'#005500',brightRed:'#ff4444',brightGreen:'#55ff55',
@@ -292,9 +318,9 @@ var THEMES = {
     brightCyan:'#55ffaa',brightWhite:'#ccffcc',
   },
   dracula:{
-    background:'rgba(40,42,54,0.95)',foreground:'#f8f8f2',
+    background:'rgba(40,42,54,0.96)',foreground:'#f8f8f2',
     cursor:'#f8f8f2',cursorAccent:'#282a36',
-    selectionBackground:'rgba(248,248,242,.2)',
+    selectionBackground:'rgba(248,248,242,0.2)',
     black:'#21222c',red:'#ff5555',green:'#50fa7b',yellow:'#f1fa8c',
     blue:'#bd93f9',magenta:'#ff79c6',cyan:'#8be9fd',white:'#f8f8f2',
     brightBlack:'#6272a4',brightRed:'#ff6e6e',brightGreen:'#69ff47',
@@ -303,376 +329,405 @@ var THEMES = {
   },
 };
 
-/* ── xterm ── */
-var fontSize = 14;
-var curTheme = 'kali';
+/* ─── Prefs ─── */
+var fontSize = +(localStorage.getItem('kali_fs') || 14);
+var curTheme =   localStorage.getItem('kali_theme') || 'kali';
 
+/* ─── xterm ─── */
+var _FA = window.FitAddon;
+var FitCls = (_FA && _FA.FitAddon) ? _FA.FitAddon : _FA;
 var term = new Terminal({
   cursorBlink:true, cursorStyle:'block',
   fontSize:fontSize,
   fontFamily:'"Courier New",Courier,monospace',
   lineHeight:1.2, scrollback:50000,
-  allowTransparency:true, theme:THEMES.kali,
-  scrollOnUserInput:true,
-  disableStdin:false, convertEol:false,
+  allowTransparency:true,
+  theme:THEMES[curTheme] || THEMES.kali,
+  disableStdin:false, convertEol:false, scrollOnUserInput:true,
 });
-
-var _FA = window.FitAddon;
-var FitAddonClass = (_FA && _FA.FitAddon) ? _FA.FitAddon : _FA;
-var fit = new FitAddonClass();
+var fit = new FitCls();
 term.loadAddon(fit);
 term.open(document.getElementById('tinner'));
-term.write('\x1b[1;32mKali Linux Terminal\x1b[0m \x1b[2m\x1b[32m— connecting...\x1b[0m\r\n');
 
 function doFit() {
   try {
     fit.fit();
-    var s = actSess();
-    if (s) s.sock.emit('resize', {cols:term.cols, rows:term.rows});
-  } catch(e){}
+    var s = getActive();
+    if (s && s.sock.connected) s.sock.emit('resize',{cols:term.cols,rows:term.rows});
+  } catch(_){}
 }
-new ResizeObserver(doFit).observe(document.getElementById('tinner'));
-window.addEventListener('resize', doFit);
+
+/* ─── CRITICAL: resize #app to visual viewport (keeps keybar above keyboard) ─── */
+var appEl = document.getElementById('app');
+function resizeToVV() {
+  var vv = window.visualViewport;
+  if (vv) {
+    appEl.style.top    = vv.offsetTop  + 'px';
+    appEl.style.height = vv.height     + 'px';
+  } else {
+    appEl.style.top    = '0px';
+    appEl.style.height = window.innerHeight + 'px';
+  }
+  setTimeout(doFit, 30);
+}
 if (window.visualViewport) {
-  window.visualViewport.addEventListener('resize', function() { setTimeout(doFit, 60); });
+  window.visualViewport.addEventListener('resize', resizeToVV);
+  window.visualViewport.addEventListener('scroll', resizeToVV);
+}
+window.addEventListener('resize', resizeToVV);
+resizeToVV();
+
+/* Also observe term-area for ResizeObserver */
+new ResizeObserver(function(){ setTimeout(doFit,40); })
+  .observe(document.getElementById('tinner'));
+
+/* ─── Scroll to bottom ─── */
+var gobot = document.getElementById('gobot');
+term.onScroll(function(){
+  try{
+    var b = term.buffer.active;
+    gobot.classList.toggle('show', b.viewportY < b.length - term.rows - 1);
+  }catch(_){}
+});
+quickTap(gobot, function(){
+  term.scrollToBottom(); gobot.classList.remove('show'); kbFocus();
+});
+
+/* ─── Badge ─── */
+var badge = document.getElementById('badge');
+function setBadge(live){
+  badge.textContent = live ? '● LIVE' : '● OFF';
+  badge.className = live ? 'on' : 'off';
 }
 
-/* ── Scroll-to-bottom button ── */
-var goBtn = document.getElementById('go-bottom');
-term.onScroll(function() {
-  try {
-    var buf = term.buffer.active;
-    var atBottom = buf.viewportY >= buf.length - term.rows;
-    goBtn.classList.toggle('show', !atBottom);
-  } catch(e){}
-});
-goBtn.addEventListener('touchstart', function(e) {
-  e.preventDefault();
-  term.scrollToBottom();
-  goBtn.classList.remove('show');
-  focusKb();
-}, {passive:false});
-goBtn.addEventListener('mousedown', function(e) {
-  e.preventDefault();
-  term.scrollToBottom();
-  goBtn.classList.remove('show');
-  focusKb();
-});
-
-/* ── Desktop keyboard ── */
+/* ─── Modifier state ─── */
 var ctrlOn = false, altOn = false;
-term.attachCustomKeyEventHandler(function(e) {
-  if (e.type !== 'keydown') return true;
-  if (ctrlOn && e.key.length === 1) {
-    var c = e.key.toUpperCase().charCodeAt(0) - 64;
-    sendStr(c >= 1 && c <= 26 ? String.fromCharCode(c) : e.key);
-    setMod('ctrl', false); return false;
+function setCtrl(v){
+  ctrlOn = v;
+  document.getElementById('kctrl').classList.toggle('on', v);
+  if(v){ altOn=false; document.getElementById('kalt').classList.remove('on'); }
+}
+function setAlt(v){
+  altOn = v;
+  document.getElementById('kalt').classList.toggle('on', v);
+  if(v){ ctrlOn=false; document.getElementById('kctrl').classList.remove('on'); }
+}
+
+/* ─── Send to active shell ─── */
+function send(str){
+  var s = getActive();
+  if(s && s.sock.connected) s.sock.emit('input', str);
+}
+
+/* ─── Desktop keyboard ─── */
+term.attachCustomKeyEventHandler(function(e){
+  if(e.type !== 'keydown') return true;
+  if(ctrlOn && e.key.length===1){
+    var c = e.key.toUpperCase().charCodeAt(0)-64;
+    send(c>=1&&c<=26 ? String.fromCharCode(c) : e.key);
+    setCtrl(false); return false;
   }
-  if (altOn && e.key.length === 1) {
-    sendStr('\x1b' + e.key); setMod('alt', false); return false;
-  }
+  if(altOn && e.key.length===1){ send('\x1b'+e.key); setAlt(false); return false; }
   return true;
 });
-term.onData(function(d) { sendStr(d); });
-document.getElementById('term-area').addEventListener('click', function() { term.focus(); });
+term.onData(function(d){ send(d); });
+document.getElementById('term-area').addEventListener('click', function(){ term.focus(); });
 
-/* ── iOS keyboard overlay (transparent textarea) ── */
+/* ─── iOS transparent textarea ─── */
 var kb  = document.getElementById('kb');
 var ZWS = '\u200b';
-
-function kbReset() { kb.value = ZWS; }
+function kbReset(){ try{kb.value=ZWS;}catch(_){} }
+function kbFocus(){
+  try{ kb.focus(); } catch(_){}
+  setTimeout(function(){ try{ kb.focus(); } catch(_){} }, 40);
+}
 kbReset();
+kb.addEventListener('focus', kbReset);
 
-kb.addEventListener('focus', kbReset, false);
-
-/* Intercept special keys before input fires */
-kb.addEventListener('keydown', function(e) {
-  switch(e.key) {
-    case 'Enter':     e.preventDefault(); sendStr('\r');     kbReset(); return;
-    case 'Tab':       e.preventDefault(); sendStr('\t');              return;
-    case 'Escape':    e.preventDefault(); sendStr('\x1b');            return;
-    case 'ArrowUp':   e.preventDefault(); sendStr('\x1b[A');          return;
-    case 'ArrowDown': e.preventDefault(); sendStr('\x1b[B');          return;
-    case 'ArrowLeft': e.preventDefault(); sendStr('\x1b[D');          return;
-    case 'ArrowRight':e.preventDefault(); sendStr('\x1b[C');          return;
-  }
-}, false);
-
-/* Text input (typing + autocomplete) */
-kb.addEventListener('input', function() {
-  var v = kb.value;
-  /* backspace deleted the sentinel */
-  if (v.length === 0) { sendStr('\x7f'); kbReset(); return; }
-  if (v.length > 1) {
-    var typed = v.replace(ZWS, '');
-    if (ctrlOn) {
-      var code = typed[0].toUpperCase().charCodeAt(0) - 64;
-      sendStr(code >= 1 && code <= 26 ? String.fromCharCode(code) : typed[0]);
-      if (typed.length > 1) sendStr(typed.slice(1));
-      setMod('ctrl', false);
-    } else if (altOn) {
-      sendStr('\x1b' + typed[0]);
-      if (typed.length > 1) sendStr(typed.slice(1));
-      setMod('alt', false);
-    } else {
-      /* Normalize line endings for multi-line paste */
-      sendStr(typed.replace(/\r\n|\r/g, '\n'));
-    }
-    kbReset();
-  }
-}, false);
-
-/*
- * PASTE — fires when user taps iOS "Paste" from long-press menu,
- * or Cmd+V from a hardware keyboard.
- */
-kb.addEventListener('paste', function(e) {
-  e.preventDefault();
-  var text = (e.clipboardData || window.clipboardData).getData('text');
-  if (text) {
-    sendStr(text.replace(/\r\n|\r/g, '\n'));
-    kbReset();
-  }
-}, false);
-
-/* Touch: scroll terminal + detect left-edge swipe for drawer */
-var _tx0 = 0, _ty0 = 0, _ty1 = 0, _swipeDone = false;
-kb.addEventListener('touchstart', function(e) {
-  _tx0 = e.touches[0].clientX;
-  _ty0 = _ty1 = e.touches[0].clientY;
-  _swipeDone = false;
-}, {passive:true});
-
-kb.addEventListener('touchmove', function(e) {
-  var x  = e.touches[0].clientX;
-  var y  = e.touches[0].clientY;
-  var dy = _ty1 - y;
-  _ty1   = y;
-
-  /* Scroll terminal with touch */
-  if (Math.abs(dy) > 0.5) {
-    term.scrollLines(Math.round(dy / (fontSize * 1.25)));
-  }
-
-  /* Left-edge swipe → open drawer */
-  if (!_swipeDone && _tx0 < 30 && (x - _tx0) > 55 && Math.abs(y - _ty0) < 70) {
-    _swipeDone = true;
-    openDrawer();
-  }
-}, {passive:true});
-
-function focusKb() {
-  try { kb.focus(); } catch(e){}
-}
-
-/* ── Sessions ── */
-var sessions = [], activeId = null, sn = 0;
-
-function actSess() {
-  return sessions.find(function(s){ return s.id === activeId; }) || null;
-}
-function sendStr(str) {
-  var s = actSess();
-  if (s && s.sock.connected) s.sock.emit('input', str);
-}
-
-function newSession() {
-  sn++;
-  var id   = 'S' + sn;
-  var sock = io({transports:['websocket','polling'], reconnectionAttempts:15});
-  var sess = {id:id, name:'bash ' + sn, sock:sock, on:false};
-  sessions.push(sess);
-
-  sock.on('connect', function() {
-    sess.on = true; refreshList();
-    if (activeId === id) {
-      try { fit.fit(); sock.emit('resize',{cols:term.cols,rows:term.rows}); } catch(e){}
-    }
-    focusKb();
-  });
-  sock.on('connect_error', function(err) {
-    if (activeId === id)
-      term.write('\r\n\x1b[31m[connection error: ' + err.message + ']\x1b[0m\r\n');
-  });
-  sock.on('disconnect', function() { sess.on = false; refreshList(); });
-  sock.on('output', function(d) {
-    if (activeId !== id) return;
-    var buf = term.buffer.active;
-    var wasAtBottom = buf.viewportY >= buf.length - term.rows - 2;
-    term.write(d);
-    if (wasAtBottom) { try { term.scrollToBottom(); } catch(e){} }
-  });
-
-  switchTo(id);
-  return sess;
-}
-
-function switchTo(id) {
-  activeId = id; refreshList();
-  try {
-    fit.fit();
-    var s = actSess();
-    if (s) s.sock.emit('resize', {cols:term.cols, rows:term.rows});
-  } catch(e){}
-  focusKb();
-}
-
-function killSess(id) {
-  if (sessions.length <= 1) return;
-  var i = sessions.findIndex(function(s){ return s.id === id; });
-  if (i < 0) return;
-  try { sessions[i].sock.disconnect(); } catch(e){}
-  sessions.splice(i, 1);
-  if (activeId === id) switchTo(sessions[Math.max(0, i-1)].id);
-  else refreshList();
-}
-
-/* Session list — instant touchend response (no 300ms click delay) */
-function refreshList() {
-  var l = document.getElementById('sess-list');
-  l.innerHTML = '';
-  sessions.forEach(function(s) {
-    var sid = s.id;
-    var el  = document.createElement('div');
-    el.className = 'si' + (sid === activeId ? ' cur' : '');
-
-    el.innerHTML =
-      '<div class="dot ' + (s.on ? 'on' : 'dead') + '"></div>' +
-      '<div class="nm">' + s.name + '</div>' +
-      (sessions.length > 1
-        ? '<div class="cx" data-id="' + sid + '">&#x2715;</div>'
-        : '');
-
-    /* Instant visual feedback */
-    el.addEventListener('touchstart', function() {
-      el.classList.add('active-touch');
-    }, {passive:true});
-
-    /* Respond on touchend — no 300ms delay */
-    el.addEventListener('touchend', function(e) {
-      e.preventDefault();
-      el.classList.remove('active-touch');
-      var tgt = e.target;
-      if (tgt.classList.contains('cx')) {
-        killSess(tgt.dataset.id); return;
-      }
-      switchTo(sid); closeDrawer();
-    }, {passive:false});
-
-    el.addEventListener('touchcancel', function() {
-      el.classList.remove('active-touch');
-    }, {passive:true});
-
-    /* Mouse fallback for desktop */
-    el.addEventListener('click', function(e) {
-      if (e.target.classList.contains('cx')) { killSess(e.target.dataset.id); return; }
-      switchTo(sid); closeDrawer();
-    });
-
-    l.appendChild(el);
-  });
-}
-
-/* ── Drawer ── */
-function openDrawer()  {
-  document.getElementById('drawer').classList.add('open');
-  document.getElementById('mask').classList.add('open');
-}
-function closeDrawer() {
-  document.getElementById('drawer').classList.remove('open');
-  document.getElementById('mask').classList.remove('open');
-}
-
-function on(id, ev, fn, opt) {
-  var el = document.getElementById(id);
-  if (el) el.addEventListener(ev, fn, opt || false);
-}
-on('mask',            'touchstart', function(e){e.preventDefault();closeDrawer();},             {passive:false});
-on('mask',            'mousedown',  closeDrawer);
-on('btn-new',         'touchstart', function(e){e.preventDefault();newSession();closeDrawer();},{passive:false});
-on('btn-new',         'mousedown',  function(e){e.preventDefault();newSession();closeDrawer();});
-on('drawer-settings', 'touchstart', function(e){e.preventDefault();closeDrawer();openSettings();},{passive:false});
-on('drawer-settings', 'mousedown',  function(){closeDrawer();openSettings();});
-
-/* ── Settings ── */
-function openSettings()  {
-  document.getElementById('ssheet').classList.add('open');
-  document.getElementById('smask').classList.add('open');
-}
-function closeSettings() {
-  document.getElementById('ssheet').classList.remove('open');
-  document.getElementById('smask').classList.remove('open');
-}
-on('smask',  'touchstart', function(e){e.preventDefault();closeSettings();},{passive:false});
-on('smask',  'mousedown',  closeSettings);
-on('sclose', 'touchstart', function(e){e.preventDefault();closeSettings();},{passive:false});
-on('sclose', 'mousedown',  closeSettings);
-
-function setFontSize(n) {
-  fontSize = Math.max(8, Math.min(24, n));
-  document.getElementById('fsval').textContent = fontSize;
-  term.options.fontSize = fontSize;
-  doFit();
-}
-on('fsm', 'touchstart', function(e){e.preventDefault();setFontSize(fontSize-1);},{passive:false});
-on('fsm', 'mousedown',  function(e){e.preventDefault();setFontSize(fontSize-1);});
-on('fsp', 'touchstart', function(e){e.preventDefault();setFontSize(fontSize+1);},{passive:false});
-on('fsp', 'mousedown',  function(e){e.preventDefault();setFontSize(fontSize+1);});
-
-document.querySelectorAll('.topt').forEach(function(o) {
-  function applyTheme() {
-    curTheme = o.dataset.t;
-    document.querySelectorAll('.topt').forEach(function(x) {
-      x.classList.toggle('on', x.dataset.t === curTheme);
-    });
-    term.options.theme = THEMES[curTheme];
-  }
-  o.addEventListener('touchstart', function(e){e.preventDefault();applyTheme();},{passive:false});
-  o.addEventListener('mousedown',  function(e){e.preventDefault();applyTheme();});
+kb.addEventListener('keydown', function(e){
+  if(e.key==='Enter')     { e.preventDefault(); send('\r');      kbReset(); }
+  else if(e.key==='Tab')       { e.preventDefault(); send('\t'); }
+  else if(e.key==='Escape')    { e.preventDefault(); send('\x1b'); }
+  else if(e.key==='ArrowUp')   { e.preventDefault(); send('\x1b[A'); }
+  else if(e.key==='ArrowDown') { e.preventDefault(); send('\x1b[B'); }
+  else if(e.key==='ArrowLeft') { e.preventDefault(); send('\x1b[D'); }
+  else if(e.key==='ArrowRight'){ e.preventDefault(); send('\x1b[C'); }
+  else if(e.key==='Backspace') { e.preventDefault(); send('\x7f'); }
 });
 
-/* ── Modifier key state ── */
-function setMod(w, v) {
-  if (w === 'ctrl') {
-    ctrlOn = v;
-    document.getElementById('k-ctrl').classList.toggle('on', v);
-    if (v) { altOn = false; document.getElementById('k-alt').classList.remove('on'); }
+kb.addEventListener('input', function(){
+  var v = kb.value;
+  if(!v || v===ZWS){ kbReset(); return; }
+  var typed = v.replace(ZWS,'');
+  if(!typed){ kbReset(); return; }
+  if(ctrlOn){
+    var c = typed[0].toUpperCase().charCodeAt(0)-64;
+    send(c>=1&&c<=26 ? String.fromCharCode(c) : typed[0]);
+    if(typed.length>1) send(typed.slice(1));
+    setCtrl(false);
+  } else if(altOn){
+    send('\x1b'+typed[0]);
+    if(typed.length>1) send(typed.slice(1));
+    setAlt(false);
   } else {
-    altOn = v;
-    document.getElementById('k-alt').classList.toggle('on', v);
-    if (v) { ctrlOn = false; document.getElementById('k-ctrl').classList.remove('on'); }
+    send(typed.replace(/\r\n|\r/g,'\n'));
   }
+  kbReset();
+});
+
+kb.addEventListener('paste', function(e){
+  e.preventDefault();
+  var t=(e.clipboardData||window.clipboardData).getData('text');
+  if(t){ send(t.replace(/\r\n|\r/g,'\n')); kbReset(); }
+});
+
+/* Touch on terminal: scroll + left-swipe to open menu */
+var _tx0=0,_ty0=0,_ty1=0,_swp=false;
+kb.addEventListener('touchstart',function(e){
+  _tx0=e.touches[0].clientX; _ty0=_ty1=e.touches[0].clientY; _swp=false;
+},{passive:true});
+kb.addEventListener('touchmove',function(e){
+  var x=e.touches[0].clientX, y=e.touches[0].clientY;
+  var dy=_ty1-y; _ty1=y;
+  if(Math.abs(dy)>0.5) term.scrollLines(Math.round(dy/(fontSize*1.2)));
+  if(!_swp && _tx0<32 && x-_tx0>55 && Math.abs(y-_ty0)<70){ _swp=true; openMenu(); }
+},{passive:true});
+
+/* ─── quickTap: reliable tap on any element (touch + mouse) ─── */
+function quickTap(el, fn){
+  if(!el) return;
+  var moved=false, tx=0, ty=0;
+  el.addEventListener('touchstart',function(e){
+    moved=false; tx=e.touches[0].clientX; ty=e.touches[0].clientY;
+  },{passive:true});
+  el.addEventListener('touchmove',function(e){
+    if(Math.abs(e.touches[0].clientX-tx)>10||Math.abs(e.touches[0].clientY-ty)>10) moved=true;
+  },{passive:true});
+  el.addEventListener('touchend',function(e){
+    if(!moved){ e.preventDefault(); fn(e.target); }
+  },{passive:false});
+  el.addEventListener('mousedown',function(e){ e.preventDefault(); fn(e.target); });
 }
 
-/* ── Key bar buttons ── */
-function btn(id, fn) {
+/* ─── keyBtn: tap for keybar — fires on touchstart for instant response ─── */
+function keyBtn(id, fn){
   var el = document.getElementById(id);
-  if (!el) return;
-  el.addEventListener('touchstart', function(e) {
-    e.preventDefault();
-    el.classList.add('on');
+  if(!el) return;
+  var isMod = el.classList.contains('mod');
+
+  function fire(e){
+    if(e.cancelable) e.preventDefault();
+    if(!isMod){ el.classList.add('flash'); setTimeout(function(){ el.classList.remove('flash'); },120); }
     fn();
-  }, {passive:false});
-  el.addEventListener('touchend',  function() { el.classList.remove('on'); }, {passive:true});
-  el.addEventListener('touchcancel',function() { el.classList.remove('on'); }, {passive:true});
-  el.addEventListener('mousedown', function(e) { e.preventDefault(); el.classList.add('on'); fn(); });
-  el.addEventListener('mouseup',   function() { el.classList.remove('on'); });
+  }
+
+  el.addEventListener('touchstart', fire, {passive:false});
+  el.addEventListener('mousedown',  fire, false);
 }
 
-btn('k-esc',   function(){ sendStr('\x1b');    focusKb(); });
-btn('k-tab',   function(){ sendStr('\t');      focusKb(); });
-btn('k-dash',  function(){ sendStr('-');       focusKb(); });
-btn('k-pipe',  function(){ sendStr('|');       focusKb(); });
-btn('k-up',    function(){ sendStr('\x1b[A'); focusKb(); });
-btn('k-down',  function(){ sendStr('\x1b[B'); focusKb(); });
-btn('k-left',  function(){ sendStr('\x1b[D'); focusKb(); });
-btn('k-right', function(){ sendStr('\x1b[C'); focusKb(); });
-btn('k-ctrl',  function(){ setMod('ctrl', !ctrlOn); focusKb(); });
-btn('k-alt',   function(){ setMod('alt',  !altOn);  focusKb(); });
+/* ─── Sessions ─── */
+var sessions  = [];
+var activeId  = null;
+var sn        = 0;
+var saved     = [];
+try { saved = JSON.parse(localStorage.getItem('kali_tokens')||'[]'); } catch(_){}
 
-/* ── Boot ── */
-newSession();
-setTimeout(function() { doFit(); focusKb(); }, 150);
+function getActive(){ return sessions.find(function(s){ return s.id===activeId; })||null; }
+
+function saveTokens(){
+  localStorage.setItem('kali_tokens',
+    JSON.stringify(sessions.map(function(s){ return {token:s.token,name:s.name}; })));
+}
+
+function newSession(existToken, existName){
+  sn++;
+  var id   = 'S'+sn;
+  var name = existName || ('bash '+sn);
+  var sock = io({
+    transports:['websocket','polling'],
+    reconnection:true, reconnectionAttempts:Infinity,
+    reconnectionDelay:1000, reconnectionDelayMax:8000,
+    auth:{ token: existToken||null },
+  });
+  var s = { id:id, name:name, token:null, sock:sock, alive:false, unread:false, buf:'' };
+  sessions.push(s);
+  switchTo(id);
+
+  sock.on('session_token', function(t){ s.token=t; saveTokens(); });
+
+  sock.on('output', function(d){
+    s.buf += d;
+    if(s.buf.length>131072) s.buf=s.buf.slice(-65536);
+    if(activeId===id){
+      var b=term.buffer.active;
+      var atBot=b.viewportY>=b.length-term.rows-2;
+      term.write(d);
+      if(atBot){ try{term.scrollToBottom();}catch(_){} }
+    } else {
+      s.unread=true; renderTabs(); bgNotify(s.name,d);
+    }
+  });
+
+  sock.on('connect', function(){
+    s.alive=true;
+    if(activeId===id) setBadge(true);
+    renderTabs();
+    if(activeId===id){
+      try{fit.fit(); sock.emit('resize',{cols:term.cols,rows:term.rows});}catch(_){}
+    }
+    kbFocus();
+  });
+  sock.on('connect_error', function(){ if(activeId===id) setBadge(false); });
+  sock.on('disconnect',    function(){ s.alive=false; if(activeId===id) setBadge(false); renderTabs(); });
+}
+
+function switchTo(id){
+  activeId=id;
+  var s=sessions.find(function(x){ return x.id===id; });
+  if(!s) return;
+  s.unread=false;
+  term.reset();
+  if(s.buf) term.write(s.buf);
+  setBadge(s.alive);
+  renderTabs();
+  setTimeout(function(){
+    doFit();
+    if(s.alive) s.sock.emit('resize',{cols:term.cols,rows:term.rows});
+    kbFocus();
+  },60);
+}
+
+function killSession(id){
+  if(sessions.length<=1) return;
+  var i=sessions.findIndex(function(s){ return s.id===id; });
+  if(i<0) return;
+  try{sessions[i].sock.disconnect();}catch(_){}
+  sessions.splice(i,1);
+  if(activeId===id) switchTo(sessions[Math.max(0,i-1)].id);
+  else renderTabs();
+  saveTokens();
+}
+
+/* ─── Tab bar ─── */
+function renderTabs(){
+  var c=document.getElementById('tabs');
+  c.innerHTML='';
+  sessions.forEach(function(s){
+    var sid=s.id;
+    var el=document.createElement('div');
+    el.className='tab'+(sid===activeId?' cur':'')+
+                       (s.alive?' live':' dead')+
+                       (s.unread?' unread':'');
+    el.innerHTML=
+      '<div class="tdot"></div>'+
+      '<div class="tname">'+s.name+'</div>'+
+      (sessions.length>1?'<div class="tx" data-id="'+sid+'">&#x2715;</div>':'');
+
+    quickTap(el, function(target){
+      if(target.classList.contains('tx')){ killSession(target.dataset.id); return; }
+      if(sid!==activeId) switchTo(sid);
+    });
+    c.appendChild(el);
+    if(sid===activeId) setTimeout(function(){
+      try{el.scrollIntoView({inline:'nearest',behavior:'smooth'});}catch(_){}
+    },40);
+  });
+}
+
+/* ─── Menu ─── */
+function openMenu(){
+  document.getElementById('menu').classList.add('open');
+  document.getElementById('mmask').classList.add('open');
+}
+function closeMenu(){
+  document.getElementById('menu').classList.remove('open');
+  document.getElementById('mmask').classList.remove('open');
+}
+
+quickTap(document.getElementById('menubtn'), openMenu);
+quickTap(document.getElementById('addtab'), function(){ newSession(); });
+quickTap(document.getElementById('mmask'),  closeMenu);
+quickTap(document.getElementById('mclose'), closeMenu);
+quickTap(document.getElementById('mnew'),  function(){ newSession(); closeMenu(); });
+quickTap(document.getElementById('mclear'),function(){
+  var s=getActive(); if(s) s.buf='';
+  term.clear(); closeMenu(); kbFocus();
+});
+
+/* ─── Font size ─── */
+document.getElementById('fsval').textContent=fontSize;
+function setFs(n){
+  fontSize=Math.max(8,Math.min(26,n));
+  document.getElementById('fsval').textContent=fontSize;
+  term.options.fontSize=fontSize;
+  localStorage.setItem('kali_fs',fontSize);
+  doFit();
+}
+quickTap(document.getElementById('fsm'), function(){ setFs(fontSize-1); });
+quickTap(document.getElementById('fsp'), function(){ setFs(fontSize+1); });
+
+/* ─── Theme ─── */
+function applyTheme(t){
+  curTheme=t;
+  term.options.theme=THEMES[t]||THEMES.kali;
+  localStorage.setItem('kali_theme',t);
+  document.querySelectorAll('.topt').forEach(function(x){
+    x.classList.toggle('on',x.dataset.t===t);
+  });
+}
+document.querySelectorAll('.topt').forEach(function(o){
+  quickTap(o, function(){ applyTheme(o.dataset.t); });
+});
+applyTheme(curTheme);
+
+/* ─── Notifications ─── */
+var notifOk = typeof Notification!=='undefined' && Notification.permission==='granted';
+function updateNotifBtn(){
+  if(typeof Notification==='undefined') return;
+  document.getElementById('notifbtn').classList.toggle('show', Notification.permission==='default');
+  notifOk = Notification.permission==='granted';
+}
+updateNotifBtn();
+quickTap(document.getElementById('notifbtn'), function(){
+  if(typeof Notification==='undefined') return;
+  Notification.requestPermission().then(updateNotifBtn);
+});
+function bgNotify(name,raw){
+  if(!notifOk||!document.hidden) return;
+  try{
+    var n=new Notification('Kali — '+name,{
+      body:raw.replace(/\x1b\[[0-9;]*m/g,'').trim().slice(0,80),
+      icon:'kali-bg.jpeg',tag:'kali-out',renotify:true,
+    });
+    n.onclick=function(){ window.focus(); n.close(); };
+  }catch(_){}
+}
+document.addEventListener('visibilitychange',function(){
+  if(!document.hidden){
+    var s=getActive(); if(s){s.unread=false; renderTabs();}
+    updateNotifBtn();
+  }
+});
+
+/* ─── Keybar buttons (fire on touchstart for zero delay) ─── */
+keyBtn('kctrl', function(){ setCtrl(!ctrlOn); kbFocus(); });
+keyBtn('kalt',  function(){ setAlt(!altOn);   kbFocus(); });
+keyBtn('kesc',  function(){ send('\x1b');      kbFocus(); });
+keyBtn('ktab',  function(){ send('\t');        kbFocus(); });
+keyBtn('kup',   function(){ send('\x1b[A');    kbFocus(); });
+keyBtn('kdown', function(){ send('\x1b[B');    kbFocus(); });
+keyBtn('kleft', function(){ send('\x1b[D');    kbFocus(); });
+keyBtn('kright',function(){ send('\x1b[C');    kbFocus(); });
+keyBtn('kpipe', function(){ send('|');         kbFocus(); });
+keyBtn('kdash', function(){ send('-');         kbFocus(); });
+
+/* ─── Boot ─── */
+if(saved.length){
+  saved.forEach(function(t){ newSession(t.token,t.name); });
+} else {
+  newSession();
+}
+setTimeout(function(){ resizeToVV(); kbFocus(); }, 250);
 </script>
 </body>
 </html>
