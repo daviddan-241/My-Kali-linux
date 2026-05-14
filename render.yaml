@@ -2,8 +2,10 @@ services:
   - type: web
     name: kali-terminal
     env: docker
-    plan: free
+    plan: starter
     dockerfilePath: ./Dockerfile
     envVars:
-      - key: PORT
-        value: 3000
+      - key: TERMINAL_API_KEY
+        generateValue: true
+      - key: NODE_ENV
+        value: production
