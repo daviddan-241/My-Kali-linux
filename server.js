@@ -40,24 +40,25 @@ const PROMPT_RE = /root@kali|#\s*$/m;
    This script just sets environment, prompt and prints the banner.
    No sudo setup needed — we ARE root.
 ── */
+const HOME_DIR = process.env.HOME || "/home/runner";
+const SHELL_USER = process.env.USER || "runner";
 const INIT_FILE = path.join(os.tmpdir(), "kali-init.sh");
 fs.writeFileSync(INIT_FILE, `#!/bin/bash
-# Fast init — pre-installed Docker image, already root
 export LANG=en_US.UTF-8
 export LC_ALL=C.UTF-8
 export TERM=xterm-256color
 export COLORTERM=truecolor
 export DEBIAN_FRONTEND=noninteractive
-export HISTFILE=/root/.bash_history
+export HISTFILE=${HOME_DIR}/.bash_history
 export HISTSIZE=1000
-export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/share/metasploit-framework:/root/go/bin"
+export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
 
 # Load system bashrc if present
 [ -f /etc/bash.bashrc ] && source /etc/bash.bashrc 2>/dev/null || true
-[ -f /root/.bashrc ]    && source /root/.bashrc    2>/dev/null || true
+[ -f ${HOME_DIR}/.bashrc ] && source ${HOME_DIR}/.bashrc 2>/dev/null || true
 
-# Real Kali two-line prompt
-PS1='\\[\\033[1;31m\\]┌──(\\[\\033[1;32m\\]root㉿kali\\[\\033[1;31m\\])-[\\[\\033[0;1m\\]\\w\\[\\033[1;31m\\]]\\n\\[\\033[1;31m\\]└─\\[\\033[1;32m\\]# \\[\\033[0m\\]'
+# Prompt
+PS1='\\[\\033[1;31m\\]┌──(\\[\\033[1;32m\\]${SHELL_USER}㉿kali\\[\\033[1;31m\\])-[\\[\\033[0;1m\\]\\w\\[\\033[1;31m\\]]\\n\\[\\033[1;31m\\]└─\\[\\033[1;32m\\]# \\[\\033[0m\\]'
 export PS1
 
 # ── Banner ──────────────────────────────────────────────────────────────────
@@ -69,7 +70,7 @@ cat << 'BANNER'
   █████╔╝ ███████║██║     ██║
   ██╔═██╗ ██╔══██║██║     ██║
   ██║  ██╗██║  ██║███████╗██║
-  ╚═╝  ╚═╝╚═╝  ╚═╝╚══════╝╚═╝  LINUX
+  ╚═╝  ╚═╝╚═╝  ╚═╝╚══════╝╚═╝  TERMINAL
 
 BANNER
 printf '\\033[0;32m'
@@ -83,11 +84,8 @@ cat << 'DRAGON'
 
 DRAGON
 printf '\\033[0m'
-echo -e "  \\033[1;37mOS:\\033[0m       Kali Linux Rolling  |  \\033[1;37mShell:\\033[0m bash (real PTY)"
-echo -e "  \\033[1;37mUser:\\033[0m     root  |  \\033[1;37mPython:\\033[0m $(python3 --version 2>&1 | cut -d' ' -f2)"
-echo -e "  \\033[1;37mTools:\\033[0m    nmap · hydra · sqlmap · metasploit · hashcat · gobuster · nikto · john"
-echo -e "  \\033[1;37mLists:\\033[0m    /usr/share/wordlists/rockyou.txt  |  /usr/share/seclists/"
-echo -e "  \\033[1;37mMSF:\\033[0m      msfconsole · msfvenom · msfdb"
+echo -e "  \\033[1;37mShell:\\033[0m    bash (real PTY)  |  \\033[1;37mUser:\\033[0m ${SHELL_USER}"
+echo -e "  \\033[1;37mPython:\\033[0m   $(python3 --version 2>&1 | cut -d' ' -f2 || echo 'n/a')  |  \\033[1;37mNode:\\033[0m $(node --version 2>&1 || echo 'n/a')"
 echo ""
 `);
 fs.chmodSync(INIT_FILE, 0o755);
@@ -104,11 +102,12 @@ console.log(`[api-key] ${API_KEY}`);
 function genToken() { return crypto.randomBytes(16).toString("hex"); }
 
 function spawnShell(cols = 220, rows = 50) {
+  const homeDir = process.env.HOME || "/home/runner";
   return pty.spawn("bash", ["--rcfile", INIT_FILE, "-i"], {
     name: "xterm-256color",
     cols,
     rows,
-    cwd: "/root",
+    cwd: homeDir,
     env: {
       ...process.env,
       TERM:        "xterm-256color",
@@ -116,9 +115,9 @@ function spawnShell(cols = 220, rows = 50) {
       LANG:        "en_US.UTF-8",
       LC_ALL:      "C.UTF-8",
       DEBIAN_FRONTEND: "noninteractive",
-      HOME:        "/root",
-      USER:        "root",
-      LOGNAME:     "root",
+      HOME:        homeDir,
+      USER:        process.env.USER || "runner",
+      LOGNAME:     process.env.USER || "runner",
     },
   });
 }
