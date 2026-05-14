@@ -103,13 +103,22 @@ RUN apt-get update && apt-get install -y --no-install-recommends golang-go \
     && cp /root/go/bin/* /usr/local/bin/ 2>/dev/null || true \
     && rm -rf /var/lib/apt/lists/* /root/go/pkg
 
-# ── 14. Strip nmap file capabilities (needed on seccomp-restricted hosts) ────
-RUN setcap -r /usr/lib/nmap/nmap 2>/dev/null || true \
-    && setcap -r /usr/bin/nmap   2>/dev/null || true
+# ── 14. Fix tools for unprivileged Docker (Render has no NET_RAW/NET_ADMIN) ──
+# Strip file capabilities from any binary that has them, then wrap nmap so it
+# always runs in --unprivileged mode (TCP-connect scan instead of raw sockets).
+RUN for bin in /usr/lib/nmap/nmap /usr/bin/nmap /usr/bin/hping3 \
+               /usr/bin/arping /usr/sbin/arping \
+               /usr/bin/tcpdump /usr/bin/dumpcap; do \
+      setcap -r "$bin" 2>/dev/null || true; \
+      chmod u-s  "$bin" 2>/dev/null || true; \
+    done \
+    && printf '#!/bin/bash\nexec /usr/lib/nmap/nmap --unprivileged "$@"\n' \
+         > /usr/bin/nmap \
+    && chmod +x /usr/bin/nmap
 
 # ── 15. Node.js 20 ───────────────────────────────────────────────────────────
 RUN curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
-    && apt-get install -y nodejs \
+    && apt-get install -y nodejs build-essential \
     && rm -rf /var/lib/apt/lists/*
 
 # ── 16. App ───────────────────────────────────────────────────────────────────
