@@ -151,8 +151,8 @@ RUN curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
 
 # ── 16. App ───────────────────────────────────────────────────────────────────
 WORKDIR /app
-COPY package.json package-lock.json ./
-RUN npm ci --build-from-source
+COPY package.json ./
+RUN npm install --build-from-source
 COPY . .
 
 EXPOSE 5000
