@@ -7,231 +7,168 @@
 <meta name="apple-mobile-web-app-capable" content="yes"/>
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
 <title>Kali Terminal</title>
-<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/xterm/5.3.0/xterm.min.css"/>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/xterm/5.3.0/xterm.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/xterm/5.3.0/addon-fit.min.js"></script>
+<!-- unpkg — confirmed 200 OK -->
+<link rel="stylesheet" href="https://unpkg.com/xterm@5.3.0/css/xterm.css"/>
+<script src="https://unpkg.com/xterm@5.3.0/lib/xterm.js"></script>
+<script src="https://unpkg.com/xterm-addon-fit@0.8.0/lib/xterm-addon-fit.js"></script>
 <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 
 html,body{
   width:100%;height:100%;
-  background:#000;
-  overflow:hidden;
+  background:#000;overflow:hidden;
   -webkit-text-size-adjust:100%;
   -webkit-tap-highlight-color:transparent;
 }
 
-/* ── Full-screen app — NO top bar ─── */
 #app{
   display:flex;flex-direction:column;
-  width:100%;
-  height:100vh;height:100dvh;
-  /* safe area for notch */
+  width:100%;height:100vh;height:100dvh;
   padding-top:env(safe-area-inset-top,0px);
 }
 
-/* ── Terminal — takes all remaining space ─── */
+/* ── Terminal fills all space ── */
 #term-area{
-  flex:1;
-  position:relative;
-  overflow:hidden;
-  background:#000;
-  /* cursor so user knows it's tappable */
-  cursor:text;
+  flex:1;position:relative;overflow:hidden;background:#000;
 }
-
-/* Kali dragon watermark */
 #term-area::before{
-  content:'';
-  position:absolute;inset:0;
+  content:'';position:absolute;inset:0;
   background:url('kali-bg.jpeg') center/cover no-repeat;
-  opacity:.07;
-  pointer-events:none;
-  z-index:0;
+  opacity:.08;pointer-events:none;z-index:0;
 }
-
 #tinner{
-  position:absolute;inset:0;
-  padding:2px 4px;
-  z-index:1;
+  position:absolute;inset:0;padding:2px 4px;z-index:1;
 }
 .xterm{height:100%!important;}
 .xterm-viewport{background:transparent!important;}
-.xterm-screen{cursor:text!important;}
 
-/* ── Key row — exact Termux style ─── */
+/*
+ * iOS KEYBOARD OVERLAY
+ * Covers entire terminal area. User taps this directly — no programmatic
+ * focus needed. Must be opacity:0 (not display/visibility/pointer-events none).
+ * font-size:16px prevents iOS auto-zoom.
+ */
+#kb{
+  position:absolute;top:0;left:0;width:100%;height:100%;
+  z-index:10;
+  opacity:0;
+  font-size:16px;
+  resize:none;
+  background:transparent;
+  border:none;outline:none;padding:0;
+  color:transparent;caret-color:transparent;
+  -webkit-appearance:none;
+  /* touch-action default (auto) — iOS needs this to show keyboard */
+}
+
+/* ── Key row — Termux style ── */
 #keybar{
-  display:flex;
-  align-items:stretch;
+  display:flex;align-items:stretch;
   height:44px;flex-shrink:0;
-  background:#1d2023;
-  border-top:1px solid #2a2a2a;
-  overflow-x:auto;overflow-y:hidden;
-  scrollbar-width:none;
+  background:#1d2023;border-top:1px solid #2a2a2a;
+  overflow-x:auto;overflow-y:hidden;scrollbar-width:none;
   padding:4px 3px;gap:2px;
 }
 #keybar::-webkit-scrollbar{display:none;}
 
-/* ── Number row — plain Termux style ─── */
+/* ── Number row ── */
 #numrow{
-  display:flex;
-  align-items:stretch;
+  display:flex;align-items:stretch;
   height:40px;flex-shrink:0;
-  background:#141618;
-  border-top:1px solid #222;
-  overflow-x:auto;overflow-y:hidden;
-  scrollbar-width:none;
+  background:#141618;border-top:1px solid #222;
+  overflow-x:auto;overflow-y:hidden;scrollbar-width:none;
   padding:4px 3px;gap:2px;
   padding-bottom:max(4px,env(safe-area-inset-bottom,4px));
 }
 #numrow::-webkit-scrollbar{display:none;}
 
-/* ── Key button ─── */
 .k{
   display:inline-flex;align-items:center;justify-content:center;
   flex:1;min-width:46px;
-  background:#2d3035;
-  border:none;
-  border-radius:3px;
-  font-size:12px;font-weight:600;
-  font-family:'Courier New',Courier,monospace;
-  color:#ddd;
-  cursor:pointer;flex-shrink:0;
+  background:#2d3035;border:none;border-radius:3px;
+  font-size:12px;font-weight:600;font-family:'Courier New',monospace;
+  color:#ddd;cursor:pointer;flex-shrink:0;
   -webkit-user-select:none;user-select:none;
   touch-action:manipulation;
   -webkit-tap-highlight-color:transparent;
-  transition:background .08s;
 }
-.k:active,.k.on{background:#3d4248;color:#fff;}
-
-/* CTRL / ALT — slightly highlighted */
+.k.on,.k:active{background:#3d4248;color:#fff;}
 .k.mod{color:#aac8ff;background:#252830;}
-.k.mod:active,.k.mod.on{background:#2e3550;color:#cce0ff;outline:1px solid #5577cc;}
+.k.mod.on,.k.mod:active{background:#2e3550;color:#cce0ff;outline:1px solid #5577cc;}
+.k.num{background:#252729;color:#eee;font-size:13px;font-weight:700;}
+.k.num.on,.k.num:active{background:#363a3e;color:#fff;}
 
-/* Number keys — slightly lighter */
-.k.num{
-  background:#252729;
-  color:#eee;
-  font-size:13px;font-weight:700;
-}
-.k.num:active{background:#363a3e;color:#fff;}
-
-/* ── iOS hidden keyboard input ─── */
-/* CRITICAL: NOT display:none, NOT visibility:hidden, NOT pointer-events:none */
-#kb{
-  position:fixed;
-  bottom:0;left:0;
-  width:100%;
-  /* 44px gives iOS enough hit target to accept focus() */
-  height:44px;
-  font-size:16px;          /* prevent iOS zoom */
-  opacity:0;
-  z-index:0;
-  border:none;outline:none;
-  background:transparent;
-  color:transparent;
-  caret-color:transparent;
-  -webkit-appearance:none;
-  /* NOT display:none / visibility:hidden / pointer-events:none */
-}
-
-/* ── Sessions drawer ─── */
-#mask{
-  display:none;position:fixed;inset:0;
-  background:rgba(0,0,0,.65);z-index:40;
-}
+/* ── Sessions drawer ── */
+#mask{display:none;position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:40;}
 #mask.open{display:block;}
-
 #drawer{
   position:fixed;top:0;left:0;bottom:0;width:260px;
-  background:#111314;
-  border-right:1px solid #222;
-  z-index:41;
-  transform:translateX(-100%);
+  background:#111314;border-right:1px solid #222;
+  z-index:41;transform:translateX(-100%);
   transition:transform .26s cubic-bezier(.4,0,.2,1);
   display:flex;flex-direction:column;
   padding-top:env(safe-area-inset-top,0px);
 }
 #drawer.open{transform:translateX(0);}
-
-#drawer-head{
-  padding:18px 16px 12px;
-  border-bottom:1px solid #1e1e1e;
-  font-size:10px;letter-spacing:2px;text-transform:uppercase;
-  color:#444;font-family:'Courier New',monospace;
-}
-
+#drawer-head{padding:18px 16px 12px;border-bottom:1px solid #1e1e1e;
+  font-size:10px;letter-spacing:2px;text-transform:uppercase;color:#444;
+  font-family:'Courier New',monospace;}
 #sess-list{flex:1;overflow-y:auto;padding:4px 0;}
-
-.si{
-  display:flex;align-items:center;gap:10px;
-  padding:11px 16px;cursor:pointer;
-  border-left:3px solid transparent;
-  -webkit-user-select:none;user-select:none;
-}
+.si{display:flex;align-items:center;gap:10px;padding:11px 16px;cursor:pointer;
+  border-left:3px solid transparent;-webkit-user-select:none;user-select:none;}
 .si:active{background:#1a1a1a;}
 .si.cur{background:#141414;border-left-color:#55ff55;}
 .si .dot{width:7px;height:7px;border-radius:50%;background:#333;flex-shrink:0;}
 .si.cur .dot,.si .dot.on{background:#55ff55;box-shadow:0 0 5px #55ff55;}
 .si .dot.dead{background:#ff5555;}
-.si .nm{flex:1;font-size:13px;color:#999;font-family:'Courier New',monospace;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.si .nm{flex:1;font-size:13px;color:#999;font-family:'Courier New',monospace;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 .si.cur .nm{color:#55ff55;}
 .si .cx{font-size:14px;color:#333;padding:2px 4px;}
 .si .cx:active{color:#ff5555;}
-
-#btn-new{
-  margin:10px 12px 14px;padding:11px;
-  background:#0a1a0a;border:1px dashed #1d4a1d;
-  border-radius:5px;text-align:center;
+#btn-new{margin:10px 12px 14px;padding:11px;background:#0a1a0a;
+  border:1px dashed #1d4a1d;border-radius:5px;text-align:center;
   font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;
-  color:#55ff55;cursor:pointer;
-  font-family:'Courier New',monospace;
-  -webkit-user-select:none;user-select:none;
-  touch-action:manipulation;
-}
+  color:#55ff55;cursor:pointer;font-family:'Courier New',monospace;
+  -webkit-user-select:none;user-select:none;touch-action:manipulation;}
 #btn-new:active{background:#0e220e;}
-
-/* Settings link at bottom of drawer */
-#drawer-settings{
-  padding:12px 16px;border-top:1px solid #1a1a1a;
-  font-size:12px;color:#555;
-  font-family:'Courier New',monospace;
-  cursor:pointer;letter-spacing:.5px;
-  -webkit-user-select:none;user-select:none;
-  flex-shrink:0;
-}
+#drawer-settings{padding:12px 16px;border-top:1px solid #1a1a1a;
+  font-size:12px;color:#555;font-family:'Courier New',monospace;cursor:pointer;
+  -webkit-user-select:none;user-select:none;flex-shrink:0;}
 #drawer-settings:active{color:#aaa;}
 
-/* ── Settings sheet ─── */
-#smask{
-  display:none;position:fixed;inset:0;
-  background:rgba(0,0,0,.5);z-index:50;
-}
+/* ── Settings sheet ── */
+#smask{display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:50;}
 #smask.open{display:block;}
-
-#ssheet{
-  position:fixed;bottom:0;left:0;right:0;
-  background:#111;
+#ssheet{position:fixed;bottom:0;left:0;right:0;background:#111;
   border-top:1px solid #222;border-radius:12px 12px 0 0;
-  z-index:51;
-  transform:translateY(100%);
+  z-index:51;transform:translateY(100%);
   transition:transform .28s cubic-bezier(.4,0,.2,1);
-  padding-bottom:env(safe-area-inset-bottom,0);
-}
+  padding-bottom:env(safe-area-inset-bottom,0);}
 #ssheet.open{transform:translateY(0);}
-
 .sh{width:36px;height:4px;background:#2a2a2a;border-radius:2px;margin:10px auto 4px;}
-.stitle{text-align:center;font-size:10px;letter-spacing:2px;text-transform:uppercase;color:#444;padding:4px 0 10px;font-family:'Courier New',monospace;}
+.stitle{text-align:center;font-size:10px;letter-spacing:2px;text-transform:uppercase;
+  color:#444;padding:4px 0 10px;font-family:'Courier New',monospace;}
 .srow{display:flex;align-items:center;padding:13px 18px;border-top:1px solid #1a1a1a;gap:10px;}
 .slbl{flex:1;font-size:13px;color:#999;font-family:'Courier New',monospace;}
-.sbtn{width:38px;height:38px;display:flex;align-items:center;justify-content:center;background:#1e1e1e;border:1px solid #2e2e2e;border-radius:5px;font-size:20px;color:#888;cursor:pointer;-webkit-user-select:none;user-select:none;touch-action:manipulation;}
+.sbtn{width:38px;height:38px;display:flex;align-items:center;justify-content:center;
+  background:#1e1e1e;border:1px solid #2e2e2e;border-radius:5px;
+  font-size:20px;color:#888;cursor:pointer;
+  -webkit-user-select:none;user-select:none;touch-action:manipulation;}
 .sbtn:active{background:#252525;color:#55ff55;}
-#fsval{width:32px;text-align:center;font-size:14px;font-weight:700;color:#ddd;font-family:'Courier New',monospace;}
-.topt{padding:7px 13px;background:#1a1a1a;border:1px solid #2a2a2a;border-radius:16px;font-size:11px;font-weight:700;color:#555;cursor:pointer;font-family:'Courier New',monospace;-webkit-user-select:none;user-select:none;touch-action:manipulation;}
+#fsval{width:32px;text-align:center;font-size:14px;font-weight:700;color:#ddd;
+  font-family:'Courier New',monospace;}
+.topt{padding:7px 13px;background:#1a1a1a;border:1px solid #2a2a2a;border-radius:16px;
+  font-size:11px;font-weight:700;color:#555;cursor:pointer;
+  font-family:'Courier New',monospace;
+  -webkit-user-select:none;user-select:none;touch-action:manipulation;}
 .topt.on{background:#0a200a;border-color:#2a6a2a;color:#55ff55;}
 .topt:active{background:#152215;}
-#sclose{text-align:center;padding:14px;font-size:12px;letter-spacing:1px;text-transform:uppercase;color:#444;cursor:pointer;font-family:'Courier New',monospace;border-top:1px solid #1a1a1a;-webkit-user-select:none;user-select:none;}
+#sclose{text-align:center;padding:14px;font-size:12px;letter-spacing:1px;
+  text-transform:uppercase;color:#444;cursor:pointer;
+  font-family:'Courier New',monospace;border-top:1px solid #1a1a1a;
+  -webkit-user-select:none;user-select:none;}
 #sclose:active{color:#666;}
 </style>
 </head>
@@ -239,22 +176,31 @@ html,body{
 <div id="app">
   <div id="term-area">
     <div id="tinner"></div>
+    <!--
+      iOS keyboard overlay: covers the entire terminal.
+      Tapping it opens the keyboard naturally — no JS focus() needed.
+      opacity:0 makes it invisible; NOT display:none / visibility:hidden.
+    -->
+    <textarea id="kb"
+      autocomplete="off" autocorrect="off"
+      autocapitalize="none" spellcheck="false"
+      inputmode="text" enterkeyhint="send"
+      tabindex="0"
+      aria-hidden="true"></textarea>
   </div>
 
-  <!-- Termux-style key row -->
   <div id="keybar">
-    <div class="k"   id="k-esc">ESC</div>
-    <div class="k"   id="k-tab">&#8677;</div>
+    <div class="k"     id="k-esc">ESC</div>
+    <div class="k"     id="k-tab">&#8677;</div>
     <div class="k mod" id="k-ctrl">CTRL</div>
     <div class="k mod" id="k-alt">ALT</div>
-    <div class="k"   id="k-dash">-</div>
-    <div class="k"   id="k-up">↑</div>
-    <div class="k"   id="k-down">↓</div>
-    <div class="k"   id="k-left">←</div>
-    <div class="k"   id="k-right">→</div>
+    <div class="k"     id="k-dash">-</div>
+    <div class="k"     id="k-up">↑</div>
+    <div class="k"     id="k-down">↓</div>
+    <div class="k"     id="k-left">←</div>
+    <div class="k"     id="k-right">→</div>
   </div>
 
-  <!-- Number row -->
   <div id="numrow">
     <div class="k num" data-c="1">1</div>
     <div class="k num" data-c="2">2</div>
@@ -269,19 +215,7 @@ html,body{
   </div>
 </div>
 
-<!--
-  iOS KEYBOARD INPUT
-  Rules: NOT display:none, NOT visibility:hidden, NOT pointer-events:none
-  font-size:16px prevents iOS auto-zoom when focused
--->
-<input id="kb" type="text"
-  autocomplete="off" autocorrect="off"
-  autocapitalize="none" spellcheck="false"
-  inputmode="text" enterkeyhint="send"
-  tabindex="-1"
-  aria-hidden="true"/>
-
-<!-- Sessions drawer -->
+<!-- Drawer -->
 <div id="mask"></div>
 <div id="drawer">
   <div id="drawer-head">Sessions</div>
@@ -290,7 +224,7 @@ html,body{
   <div id="drawer-settings">⚙  Settings</div>
 </div>
 
-<!-- Settings sheet -->
+<!-- Settings -->
 <div id="smask"></div>
 <div id="ssheet">
   <div class="sh"></div>
@@ -315,11 +249,20 @@ html,body{
 <script>
 'use strict';
 
-/* ── Themes ──────────────────────────────────────────────── */
+/* ── Safety check: bail with message if libs didn't load ── */
+if (typeof Terminal === 'undefined') {
+  document.getElementById('tinner').innerHTML =
+    '<div style="color:#ff5555;padding:12px;font-family:monospace;font-size:14px;">' +
+    'Error: xterm.js failed to load. Check your internet connection and reload.</div>';
+  throw new Error('xterm.js not loaded');
+}
+
+/* ── Themes ──────────────────────────────────────────── */
 var THEMES = {
   kali:{
     background:'rgba(0,0,0,0.9)',foreground:'#f8f8f2',
-    cursor:'#00ff41',cursorAccent:'#000',selectionBackground:'rgba(80,200,80,.2)',
+    cursor:'#00ff41',cursorAccent:'#000',
+    selectionBackground:'rgba(80,200,80,.2)',
     black:'#21222c',red:'#ff5555',green:'#55ff55',yellow:'#f1fa8c',
     blue:'#6272a4',magenta:'#ff79c6',cyan:'#8be9fd',white:'#f8f8f2',
     brightBlack:'#6272a4',brightRed:'#ff6e6e',brightGreen:'#69ff47',
@@ -328,7 +271,8 @@ var THEMES = {
   },
   matrix:{
     background:'rgba(0,0,0,0.95)',foreground:'#00ff41',
-    cursor:'#00ff41',cursorAccent:'#000',selectionBackground:'rgba(0,255,65,.2)',
+    cursor:'#00ff41',cursorAccent:'#000',
+    selectionBackground:'rgba(0,255,65,.2)',
     black:'#0d0d0d',red:'#cc0000',green:'#00ff41',yellow:'#aaff00',
     blue:'#007700',magenta:'#00aa44',cyan:'#00ffaa',white:'#aaffaa',
     brightBlack:'#005500',brightRed:'#ff4444',brightGreen:'#55ff55',
@@ -337,7 +281,8 @@ var THEMES = {
   },
   dracula:{
     background:'rgba(40,42,54,0.95)',foreground:'#f8f8f2',
-    cursor:'#f8f8f2',cursorAccent:'#282a36',selectionBackground:'rgba(248,248,242,.2)',
+    cursor:'#f8f8f2',cursorAccent:'#282a36',
+    selectionBackground:'rgba(248,248,242,.2)',
     black:'#21222c',red:'#ff5555',green:'#50fa7b',yellow:'#f1fa8c',
     blue:'#bd93f9',magenta:'#ff79c6',cyan:'#8be9fd',white:'#f8f8f2',
     brightBlack:'#6272a4',brightRed:'#ff6e6e',brightGreen:'#69ff47',
@@ -346,303 +291,309 @@ var THEMES = {
   },
 };
 
-/* ── xterm ───────────────────────────────────────────────── */
-var fontSize = 14;
-var curTheme = 'kali';
+/* ── xterm init ──────────────────────────────────────── */
+var fontSize  = 14;
+var curTheme  = 'kali';
 
 var term = new Terminal({
   cursorBlink:true, cursorStyle:'block',
-  fontSize:fontSize, fontFamily:'"Courier New",Courier,monospace',
+  fontSize:fontSize,
+  fontFamily:'"Courier New",Courier,monospace',
   lineHeight:1.2, scrollback:50000,
   allowTransparency:true, theme:THEMES.kali,
-  disableStdin:false, convertEol:false, macOptionIsMeta:true,
+  disableStdin:false, convertEol:false,
 });
-var fit = new FitAddon.FitAddon();
+
+/* Handle both FitAddon UMD export formats */
+var _FA = window.FitAddon;
+var FitAddonClass = (_FA && _FA.FitAddon) ? _FA.FitAddon : _FA;
+var fit = new FitAddonClass();
 term.loadAddon(fit);
 term.open(document.getElementById('tinner'));
 
-function doFit(){
-  try{fit.fit();var s=actSess();if(s)s.sock.emit('resize',{cols:term.cols,rows:term.rows});}catch(e){}
+/* Show something immediately — screen never blank */
+term.write('\x1b[1;32mKali Linux Terminal\x1b[0m — connecting...\r\n\r\n');
+
+function doFit() {
+  try {
+    fit.fit();
+    var s = actSess();
+    if (s) s.sock.emit('resize', {cols:term.cols, rows:term.rows});
+  } catch(e) {}
 }
-var ro=new ResizeObserver(doFit);
-ro.observe(document.getElementById('tinner'));
-window.addEventListener('resize',doFit);
-if(window.visualViewport)window.visualViewport.addEventListener('resize',doFit);
+new ResizeObserver(doFit).observe(document.getElementById('tinner'));
+window.addEventListener('resize', doFit);
+if (window.visualViewport) {
+  window.visualViewport.addEventListener('resize', function() {
+    setTimeout(doFit, 60);
+  });
+}
 
-/* ── iOS keyboard bridge ─────────────────────────────────── */
-var kb = document.getElementById('kb');
+/* Desktop keyboard */
+var ctrlOn = false, altOn = false;
+term.attachCustomKeyEventHandler(function(e) {
+  if (e.type !== 'keydown') return true;
+  if (ctrlOn && e.key.length === 1) {
+    var c = e.key.toUpperCase().charCodeAt(0) - 64;
+    sendStr(c >= 1 && c <= 26 ? String.fromCharCode(c) : e.key);
+    setMod('ctrl', false); return false;
+  }
+  if (altOn && e.key.length === 1) {
+    sendStr('\x1b' + e.key); setMod('alt', false); return false;
+  }
+  return true;
+});
+term.onData(function(d) { sendStr(d); });
 
-/*
- * Sentinel approach:
- * kb always contains one zero-width-space (\u200b).
- * – value becomes empty  → backspace was pressed → send \x7f, reset
- * – value gains chars    → user typed → send those chars, reset
- */
-var ZWS = '\u200b';
-function kbReset(){ kb.value = ZWS; }
+/* ── iOS keyboard overlay (textarea) ────────────────── */
+var kb  = document.getElementById('kb');
+var ZWS = '\u200b'; /* zero-width space sentinel */
+
+function kbReset() { kb.value = ZWS; }
 kbReset();
 
+/* When textarea gains focus (user tapped terminal) keyboard opens */
 kb.addEventListener('focus', kbReset, false);
 
-kb.addEventListener('keydown', function(e){
-  if(e.key==='Enter'){ e.preventDefault(); sendStr('\r'); kbReset(); return; }
-  if(e.key==='Tab'){ e.preventDefault(); sendStr('\t'); return; }
-  if(e.key==='Escape'){ e.preventDefault(); sendStr('\x1b'); return; }
-  if(e.key==='ArrowUp')   { e.preventDefault(); sendStr('\x1b[A'); return; }
-  if(e.key==='ArrowDown') { e.preventDefault(); sendStr('\x1b[B'); return; }
-  if(e.key==='ArrowLeft') { e.preventDefault(); sendStr('\x1b[D'); return; }
-  if(e.key==='ArrowRight'){ e.preventDefault(); sendStr('\x1b[C'); return; }
+/* Intercept Enter / Tab / Esc before input event */
+kb.addEventListener('keydown', function(e) {
+  if (e.key === 'Enter')     { e.preventDefault(); sendStr('\r');     kbReset(); return; }
+  if (e.key === 'Tab')       { e.preventDefault(); sendStr('\t');                return; }
+  if (e.key === 'Escape')    { e.preventDefault(); sendStr('\x1b');               return; }
+  if (e.key === 'ArrowUp')   { e.preventDefault(); sendStr('\x1b[A');             return; }
+  if (e.key === 'ArrowDown') { e.preventDefault(); sendStr('\x1b[B');             return; }
+  if (e.key === 'ArrowLeft') { e.preventDefault(); sendStr('\x1b[D');             return; }
+  if (e.key === 'ArrowRight'){ e.preventDefault(); sendStr('\x1b[C');             return; }
 }, false);
 
-kb.addEventListener('input', function(){
+kb.addEventListener('input', function() {
   var v = kb.value;
-  if(v.length === 0){
-    // Backspace deleted our sentinel
-    sendStr('\x7f');
-    kbReset();
-    return;
+  if (v.length === 0) {
+    /* backspace deleted our sentinel */
+    sendStr('\x7f'); kbReset(); return;
   }
-  if(v.length > 1){
-    // Characters were added after the sentinel
-    var typed = v.replace(ZWS,''); // remove sentinel wherever it is
-    if(ctrlOn){
-      var code = typed[0].toUpperCase().charCodeAt(0)-64;
-      if(code>=1&&code<=26) sendStr(String.fromCharCode(code));
-      else sendStr(typed[0]);
-      if(typed.length>1) sendStr(typed.slice(1));
-      setMod('ctrl',false);
-    } else if(altOn){
-      sendStr('\x1b'+typed[0]);
-      if(typed.length>1) sendStr(typed.slice(1));
-      setMod('alt',false);
+  if (v.length > 1) {
+    var typed = v.replace(ZWS, '');
+    if (ctrlOn) {
+      var code = typed[0].toUpperCase().charCodeAt(0) - 64;
+      sendStr(code >= 1 && code <= 26 ? String.fromCharCode(code) : typed[0]);
+      if (typed.length > 1) sendStr(typed.slice(1));
+      setMod('ctrl', false);
+    } else if (altOn) {
+      sendStr('\x1b' + typed[0]);
+      if (typed.length > 1) sendStr(typed.slice(1));
+      setMod('alt', false);
     } else {
       sendStr(typed);
     }
     kbReset();
   }
-  // v.length===1 means only our sentinel — do nothing
+  /* v.length === 1 → only the sentinel, nothing to do */
 }, false);
 
-/* ── Focus keyboard — MUST be called directly in touch handler ── */
-function focusKb(){
-  kb.focus();
+/* Touch: scroll xterm + detect left-edge swipe for drawer */
+var _ty0 = 0, _ty1 = 0, _tx0 = 0;
+kb.addEventListener('touchstart', function(e) {
+  _tx0 = e.touches[0].clientX;
+  _ty0 = _ty1 = e.touches[0].clientY;
+}, {passive:true});
+
+kb.addEventListener('touchmove', function(e) {
+  var y  = e.touches[0].clientY;
+  var dy = _ty1 - y;   /* positive = finger moved up = scroll down */
+  _ty1   = y;
+
+  /* Scroll terminal */
+  if (Math.abs(dy) > 1) {
+    term.scrollLines(Math.round(dy / (fontSize * 1.2)));
+  }
+
+  /* Left-edge swipe right → open drawer */
+  var dx    = e.touches[0].clientX - _tx0;
+  var dyTot = Math.abs(y - _ty0);
+  if (_tx0 < 35 && dx > 50 && dyTot < 80) openDrawer();
+}, {passive:true});
+
+/* Refocus the overlay after key-bar buttons so keyboard stays open */
+function focusKb() { kb.focus(); }
+
+/* ── Sessions ────────────────────────────────────────── */
+var sessions = [], activeId = null, sn = 0;
+
+function actSess() {
+  return sessions.find(function(s){ return s.id === activeId; }) || null;
+}
+function sendStr(str) {
+  var s = actSess();
+  if (s && s.sock.connected) s.sock.emit('input', str);
 }
 
-/* ── Terminal tap → open keyboard (iOS) ─────────────────── */
-/*
- * IMPORTANT: xterm.js calls stopPropagation() on touch events inside the
- * canvas, so attaching to #term-area (bubble) never fires on iOS.
- * Using capture=true on document fires BEFORE xterm can stop propagation.
- */
-var tapStartX=0, tapStartY=0;
-var termArea = document.getElementById('term-area');
-
-document.addEventListener('touchstart', function(e){
-  if(!termArea.contains(e.target)) return;
-  tapStartX = e.touches[0].clientX;
-  tapStartY = e.touches[0].clientY;
-  focusKb(); // DIRECT sync call in user-gesture — required for iOS keyboard
-}, true /* capture phase */);
-
-document.addEventListener('touchmove', function(e){
-  if(!termArea.contains(e.target)) return;
-  var dx = e.touches[0].clientX - tapStartX;
-  var dy = Math.abs(e.touches[0].clientY - tapStartY);
-  if(tapStartX < 35 && dx > 45 && dy < 80) openDrawer();
-}, true);
-
-/* Desktop click */
-document.getElementById('term-area').addEventListener('click', function(){
-  term.focus(); focusKb();
-});
-
-/* xterm keyhandler for desktop + physical keyboard modifier support */
-var ctrlOn=false, altOn=false;
-
-term.attachCustomKeyEventHandler(function(e){
-  if(e.type!=='keydown') return true;
-  if(ctrlOn){
-    if(e.key.length===1){
-      var c=e.key.toUpperCase().charCodeAt(0)-64;
-      sendStr(c>=1&&c<=26 ? String.fromCharCode(c) : e.key);
-      setMod('ctrl',false); return false;
-    }
-  }
-  if(altOn){
-    if(e.key.length===1){ sendStr('\x1b'+e.key); setMod('alt',false); return false; }
-  }
-  return true;
-});
-
-term.onData(function(d){ sendStr(d); });
-
-/* ── Session management ──────────────────────────────────── */
-var sessions=[], activeId=null, sn=0;
-
-function actSess(){ return sessions.find(function(s){return s.id===activeId;})||null; }
-
-function sendStr(str){
-  var s=actSess();
-  if(s&&s.sock.connected) s.sock.emit('input',str);
-}
-
-function newSession(){
+function newSession() {
   sn++;
-  var id='S'+sn;
-  var sock=io({transports:['websocket','polling'],reconnectionAttempts:15});
-  var sess={id:id, name:'bash '+sn, sock:sock, on:false};
+  var id   = 'S' + sn;
+  var sock = io({transports:['websocket','polling'], reconnectionAttempts:15});
+  var sess = {id:id, name:'bash '+sn, sock:sock, on:false};
   sessions.push(sess);
 
-  sock.on('connect',function(){
-    sess.on=true; refreshList();
-    if(activeId===id){ try{fit.fit();sock.emit('resize',{cols:term.cols,rows:term.rows});}catch(e){} }
+  sock.on('connect', function() {
+    sess.on = true; refreshList();
+    if (activeId === id) {
+      try { fit.fit(); sock.emit('resize',{cols:term.cols,rows:term.rows}); } catch(e){}
+    }
     focusKb();
   });
-  sock.on('connect_error',function(err){
-    if(activeId===id) term.write('\r\n\x1b[31m[connection error: '+err.message+']\x1b[0m\r\n');
+  sock.on('connect_error', function(err) {
+    if (activeId === id)
+      term.write('\r\n\x1b[31m[connection error: ' + err.message + ']\x1b[0m\r\n');
   });
-  sock.on('disconnect',function(){ sess.on=false; refreshList(); });
-  sock.on('output',function(d){ if(activeId===id) term.write(d); });
+  sock.on('disconnect', function() { sess.on = false; refreshList(); });
+  sock.on('output',     function(d){ if (activeId === id) term.write(d); });
 
   switchTo(id);
   return sess;
 }
 
-function switchTo(id){
-  activeId=id; refreshList();
-  try{fit.fit();var s=actSess();if(s)s.sock.emit('resize',{cols:term.cols,rows:term.rows});}catch(e){}
+function switchTo(id) {
+  activeId = id; refreshList();
+  try {
+    fit.fit();
+    var s = actSess();
+    if (s) s.sock.emit('resize', {cols:term.cols, rows:term.rows});
+  } catch(e){}
   focusKb();
 }
 
-function killSess(id){
-  if(sessions.length<=1) return;
-  var i=sessions.findIndex(function(s){return s.id===id;});
-  if(i<0) return;
-  try{sessions[i].sock.disconnect();}catch(e){}
-  sessions.splice(i,1);
-  if(activeId===id) switchTo(sessions[Math.max(0,i-1)].id);
+function killSess(id) {
+  if (sessions.length <= 1) return;
+  var i = sessions.findIndex(function(s){ return s.id === id; });
+  if (i < 0) return;
+  try { sessions[i].sock.disconnect(); } catch(e){}
+  sessions.splice(i, 1);
+  if (activeId === id) switchTo(sessions[Math.max(0, i-1)].id);
   else refreshList();
 }
 
-function refreshList(){
-  var l=document.getElementById('sess-list'); l.innerHTML='';
-  sessions.forEach(function(s){
-    var el=document.createElement('div');
-    el.className='si'+(s.id===activeId?' cur':'');
-    el.innerHTML='<div class="dot'+(s.on?' on':' dead')+'"></div>'+
-      '<div class="nm">'+s.name+'</div>'+
-      (sessions.length>1?'<div class="cx" data-id="'+s.id+'">✕</div>':'');
-    el.addEventListener('click',function(e){
-      if(e.target.classList.contains('cx')){ killSess(e.target.dataset.id); return; }
+function refreshList() {
+  var l = document.getElementById('sess-list');
+  l.innerHTML = '';
+  sessions.forEach(function(s) {
+    var el = document.createElement('div');
+    el.className = 'si' + (s.id === activeId ? ' cur' : '');
+    el.innerHTML =
+      '<div class="dot ' + (s.on ? 'on' : 'dead') + '"></div>' +
+      '<div class="nm">' + s.name + '</div>' +
+      (sessions.length > 1 ? '<div class="cx" data-id="' + s.id + '">✕</div>' : '');
+    el.addEventListener('click', function(e) {
+      if (e.target.classList.contains('cx')) { killSess(e.target.dataset.id); return; }
       switchTo(s.id); closeDrawer();
     });
     l.appendChild(el);
   });
 }
 
-/* ── Drawer ──────────────────────────────────────────────── */
-function openDrawer(){
-  document.getElementById('drawer').classList.add('open');
-  document.getElementById('mask').classList.add('open');
-}
-function closeDrawer(){
-  document.getElementById('drawer').classList.remove('open');
-  document.getElementById('mask').classList.remove('open');
-}
+/* ── Drawer ──────────────────────────────────────────── */
+function openDrawer()  { document.getElementById('drawer').classList.add('open');    document.getElementById('mask').classList.add('open');  }
+function closeDrawer() { document.getElementById('drawer').classList.remove('open'); document.getElementById('mask').classList.remove('open'); }
 
-function on(id,ev,fn,opt){
-  var el=document.getElementById(id);
-  if(el) el.addEventListener(ev,fn,opt||false);
+function on(id, ev, fn, opt) {
+  var el = document.getElementById(id);
+  if (el) el.addEventListener(ev, fn, opt||false);
 }
+on('mask',            'touchstart', function(e){e.preventDefault();closeDrawer();}, {passive:false});
+on('mask',            'mousedown',  closeDrawer);
+on('btn-new',         'touchstart', function(e){e.preventDefault();newSession();closeDrawer();}, {passive:false});
+on('btn-new',         'mousedown',  function(e){e.preventDefault();newSession();closeDrawer();});
+on('drawer-settings', 'touchstart', function(e){e.preventDefault();closeDrawer();openSettings();}, {passive:false});
+on('drawer-settings', 'mousedown',  function(){closeDrawer();openSettings();});
 
-on('mask','touchstart',function(e){e.preventDefault();closeDrawer();},{passive:false});
-on('mask','mousedown',closeDrawer);
-on('btn-new','touchstart',function(e){e.preventDefault();newSession();closeDrawer();},{passive:false});
-on('btn-new','mousedown',function(e){e.preventDefault();newSession();closeDrawer();});
-on('drawer-settings','touchstart',function(e){e.preventDefault();closeDrawer();openSettings();},{passive:false});
-on('drawer-settings','mousedown',function(){closeDrawer();openSettings();});
+/* ── Settings ────────────────────────────────────────── */
+function openSettings()  { document.getElementById('ssheet').classList.add('open');    document.getElementById('smask').classList.add('open');  }
+function closeSettings() { document.getElementById('ssheet').classList.remove('open'); document.getElementById('smask').classList.remove('open'); }
 
-/* ── Settings ────────────────────────────────────────────── */
-function openSettings(){
-  document.getElementById('ssheet').classList.add('open');
-  document.getElementById('smask').classList.add('open');
+on('smask',  'touchstart', function(e){e.preventDefault();closeSettings();}, {passive:false});
+on('smask',  'mousedown',  closeSettings);
+on('sclose', 'touchstart', function(e){e.preventDefault();closeSettings();}, {passive:false});
+on('sclose', 'mousedown',  closeSettings);
+
+function setFontSize(n) {
+  fontSize = Math.max(8, Math.min(24, n));
+  document.getElementById('fsval').textContent = fontSize;
+  term.options.fontSize = fontSize;
+  doFit();
 }
-function closeSettings(){
-  document.getElementById('ssheet').classList.remove('open');
-  document.getElementById('smask').classList.remove('open');
-}
-on('smask','touchstart',function(e){e.preventDefault();closeSettings();},{passive:false});
-on('smask','mousedown',closeSettings);
-on('sclose','touchstart',function(e){e.preventDefault();closeSettings();},{passive:false});
-on('sclose','mousedown',closeSettings);
+on('fsm', 'touchstart', function(e){e.preventDefault();setFontSize(fontSize-1);}, {passive:false});
+on('fsm', 'mousedown',  function(e){e.preventDefault();setFontSize(fontSize-1);});
+on('fsp', 'touchstart', function(e){e.preventDefault();setFontSize(fontSize+1);}, {passive:false});
+on('fsp', 'mousedown',  function(e){e.preventDefault();setFontSize(fontSize+1);});
 
-function setFontSize(n){
-  fontSize=Math.max(8,Math.min(24,n));
-  document.getElementById('fsval').textContent=fontSize;
-  term.options.fontSize=fontSize; doFit();
-}
-on('fsm','touchstart',function(e){e.preventDefault();setFontSize(fontSize-1);},{passive:false});
-on('fsm','mousedown',function(e){e.preventDefault();setFontSize(fontSize-1);});
-on('fsp','touchstart',function(e){e.preventDefault();setFontSize(fontSize+1);},{passive:false});
-on('fsp','mousedown',function(e){e.preventDefault();setFontSize(fontSize+1);});
-
-document.querySelectorAll('.topt').forEach(function(o){
-  function apply(){
-    curTheme=o.dataset.t;
-    document.querySelectorAll('.topt').forEach(function(x){x.classList.toggle('on',x.dataset.t===curTheme);});
-    term.options.theme=THEMES[curTheme];
+document.querySelectorAll('.topt').forEach(function(o) {
+  function apply() {
+    curTheme = o.dataset.t;
+    document.querySelectorAll('.topt').forEach(function(x){
+      x.classList.toggle('on', x.dataset.t === curTheme);
+    });
+    term.options.theme = THEMES[curTheme];
   }
-  o.addEventListener('touchstart',function(e){e.preventDefault();apply();},{passive:false});
-  o.addEventListener('mousedown',function(e){e.preventDefault();apply();});
+  o.addEventListener('touchstart', function(e){e.preventDefault();apply();}, {passive:false});
+  o.addEventListener('mousedown',  function(e){e.preventDefault();apply();});
 });
 
-/* ── Modifier keys ───────────────────────────────────────── */
-function setMod(w,v){
-  if(w==='ctrl'){ ctrlOn=v; document.getElementById('k-ctrl').classList.toggle('on',v); if(v){altOn=false;document.getElementById('k-alt').classList.remove('on');} }
-  else          { altOn=v;  document.getElementById('k-alt').classList.toggle('on',v);  if(v){ctrlOn=false;document.getElementById('k-ctrl').classList.remove('on');} }
+/* ── Modifier keys ───────────────────────────────────── */
+function setMod(w, v) {
+  if (w === 'ctrl') {
+    ctrlOn = v;
+    document.getElementById('k-ctrl').classList.toggle('on', v);
+    if (v) { altOn = false; document.getElementById('k-alt').classList.remove('on'); }
+  } else {
+    altOn = v;
+    document.getElementById('k-alt').classList.toggle('on', v);
+    if (v) { ctrlOn = false; document.getElementById('k-ctrl').classList.remove('on'); }
+  }
 }
 
-/* ── Key bar buttons ─────────────────────────────────────── */
-function btn(id,fn){
-  var el=document.getElementById(id); if(!el) return;
-  el.addEventListener('touchstart',function(e){e.preventDefault();el.classList.add('on');fn();},{passive:false});
-  el.addEventListener('touchend',function(){el.classList.remove('on');},{passive:true});
-  el.addEventListener('mousedown',function(e){e.preventDefault();el.classList.add('on');fn();});
-  el.addEventListener('mouseup',function(){el.classList.remove('on');});
+/* ── Key bar buttons ─────────────────────────────────── */
+function btn(id, fn) {
+  var el = document.getElementById(id);
+  if (!el) return;
+  el.addEventListener('touchstart', function(e) {
+    e.preventDefault(); el.classList.add('on'); fn();
+  }, {passive:false});
+  el.addEventListener('touchend',  function() { el.classList.remove('on'); }, {passive:true});
+  el.addEventListener('mousedown', function(e) { e.preventDefault(); el.classList.add('on'); fn(); });
+  el.addEventListener('mouseup',   function() { el.classList.remove('on'); });
 }
 
-btn('k-esc',  function(){sendStr('\x1b');    focusKb();});
-btn('k-tab',  function(){sendStr('\t');      focusKb();});
-btn('k-dash', function(){sendStr('-');       focusKb();});
-btn('k-up',   function(){sendStr('\x1b[A'); focusKb();});
-btn('k-down', function(){sendStr('\x1b[B'); focusKb();});
-btn('k-left', function(){sendStr('\x1b[D'); focusKb();});
-btn('k-right',function(){sendStr('\x1b[C'); focusKb();});
-btn('k-ctrl', function(){setMod('ctrl',!ctrlOn);focusKb();});
-btn('k-alt',  function(){setMod('alt',!altOn);  focusKb();});
+btn('k-esc',  function(){ sendStr('\x1b');    focusKb(); });
+btn('k-tab',  function(){ sendStr('\t');      focusKb(); });
+btn('k-dash', function(){ sendStr('-');       focusKb(); });
+btn('k-up',   function(){ sendStr('\x1b[A'); focusKb(); });
+btn('k-down', function(){ sendStr('\x1b[B'); focusKb(); });
+btn('k-left', function(){ sendStr('\x1b[D'); focusKb(); });
+btn('k-right',function(){ sendStr('\x1b[C'); focusKb(); });
+btn('k-ctrl', function(){ setMod('ctrl', !ctrlOn); focusKb(); });
+btn('k-alt',  function(){ setMod('alt',  !altOn);  focusKb(); });
 
-document.querySelectorAll('#numrow .k').forEach(function(el){
-  el.addEventListener('touchstart',function(e){
+document.querySelectorAll('#numrow .k').forEach(function(el) {
+  el.addEventListener('touchstart', function(e) {
     e.preventDefault(); el.classList.add('on');
-    var c=el.dataset.c;
-    sendStr(c);
-    focusKb();
-  },{passive:false});
-  el.addEventListener('touchend',function(){el.classList.remove('on');},{passive:true});
-  el.addEventListener('mousedown',function(e){
+    sendStr(el.dataset.c); focusKb();
+  }, {passive:false});
+  el.addEventListener('touchend', function(){ el.classList.remove('on'); }, {passive:true});
+  el.addEventListener('mousedown', function(e) {
     e.preventDefault(); el.classList.add('on');
     sendStr(el.dataset.c); focusKb();
   });
-  el.addEventListener('mouseup',function(){el.classList.remove('on');});
+  el.addEventListener('mouseup', function(){ el.classList.remove('on'); });
 });
 
-/* ── Boot ────────────────────────────────────────────────── */
-// Show immediately — before socket connects — so screen is never blank
-term.write('\x1b[1;32mKali Linux Terminal\x1b[0m\r\n');
-term.write('Connecting to shell\x1b[2m...\x1b[0m\r\n\r\n');
+/* Desktop: click on terminal */
+document.getElementById('term-area').addEventListener('click', function() {
+  term.focus();
+});
 
+/* ── Boot ────────────────────────────────────────────── */
 newSession();
-setTimeout(function(){ doFit(); focusKb(); }, 120);
+setTimeout(function(){ doFit(); focusKb(); }, 150);
 </script>
 </body>
 </html>
