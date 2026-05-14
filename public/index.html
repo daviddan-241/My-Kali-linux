@@ -14,489 +14,340 @@
 <style>
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
-:root {
-  --black: #000;
-  --green: #00ff00;
-  --cyan:  #00cccc;
-  --dim:   #333;
-  --text:  #eee;
-  --bar:   #0a0a0a;
-  --key:   #111;
-  --key-border: #222;
-}
-
 html, body {
   width: 100%; height: 100%;
-  background: var(--black);
+  background: #000;
   overflow: hidden;
-  font-family: 'Courier New', Courier, monospace;
   -webkit-text-size-adjust: 100%;
   -webkit-tap-highlight-color: transparent;
 }
 
-/* Kali dragon — subtle watermark */
-body::before {
-  content: '';
-  position: fixed; inset: 0;
-  background: url('kali-bg.jpeg') center center / cover no-repeat;
-  opacity: .12;
-  pointer-events: none;
-  z-index: 0;
-}
-
 #app {
-  position: relative; z-index: 1;
   display: flex; flex-direction: column;
   width: 100%;
-  /* full height minus iOS safe areas */
   height: 100vh; height: 100dvh;
 }
 
-/* ── Tab bar ──────────────────────────────────────────────────────── */
-#tabbar {
-  display: flex; align-items: stretch;
-  height: 32px; flex-shrink: 0;
-  background: var(--bar);
-  border-bottom: 1px solid #111;
-  overflow-x: auto; overflow-y: hidden;
-  scrollbar-width: none;
-}
-#tabbar::-webkit-scrollbar { display: none; }
-
-.tab {
-  display: flex; align-items: center; gap: 5px;
-  padding: 0 10px;
-  min-width: 80px; max-width: 120px;
-  font-size: 12px; color: #444;
-  border-right: 1px solid #111;
-  cursor: pointer; white-space: nowrap; flex-shrink: 0;
-  user-select: none; -webkit-user-select: none;
-}
-.tab.active { color: var(--green); border-bottom: 2px solid var(--green); }
-.tab .dot { width: 5px; height: 5px; border-radius: 50%; background: #222; flex-shrink: 0; }
-.tab.active .dot { background: var(--green); }
-.tab .lbl { flex: 1; overflow: hidden; text-overflow: ellipsis; font-size: 11px; }
-.tab .x { color: #333; font-size: 13px; padding: 0 2px; }
-.tab .x:active { color: #f44; }
-
-#btn-add {
-  display: flex; align-items: center; justify-content: center;
-  width: 34px; min-width: 34px; font-size: 20px;
-  color: #333; cursor: pointer;
-  border-left: 1px solid #111; margin-left: auto;
-  user-select: none; -webkit-user-select: none;
-}
-#btn-add:active { color: var(--green); }
-
-/* ── Terminal output (xterm) ──────────────────────────────────────── */
-#terms {
-  flex: 1; position: relative;
-  overflow: hidden; background: rgba(0,0,0,0.7);
-  /* tappable to focus */
+/* ── Terminal fills all space ─────────────────────────────── */
+#terminal {
+  flex: 1;
+  overflow: hidden;
+  background: #000;
   cursor: text;
 }
-.pane {
-  display: none; position: absolute; inset: 0;
-}
-.pane.active { display: block; }
-.tinner { width: 100%; height: 100%; padding: 4px 2px 2px 4px; }
+.tinner { width: 100%; height: 100%; padding: 4px; }
 
 .xterm { height: 100% !important; }
 .xterm-viewport { background: transparent !important; }
+.xterm-screen { cursor: text !important; }
 
-/* ── Special-key toolbar ──────────────────────────────────────────── */
-#specials {
-  display: flex; align-items: center;
-  height: 38px; flex-shrink: 0;
-  background: var(--bar); border-top: 1px solid #111;
+/* ── Extra key row (Termux style) ─────────────────────────── */
+#keybar {
+  display: flex;
+  height: 46px; flex-shrink: 0;
+  background: #1a1a1a;
+  border-top: 1px solid #2a2a2a;
+  align-items: center;
   overflow-x: auto; overflow-y: hidden;
-  scrollbar-width: none; gap: 2px; padding: 2px 3px;
+  scrollbar-width: none;
+  gap: 2px; padding: 4px 4px;
 }
-#specials::-webkit-scrollbar { display: none; }
+#keybar::-webkit-scrollbar { display: none; }
 
-/* ── Number / symbol row ──────────────────────────────────────────── */
-#symbols {
-  display: flex; align-items: center;
-  height: 38px; flex-shrink: 0;
-  background: var(--bar); border-top: 1px solid #0a0a0a;
+/* ── Number row ───────────────────────────────────────────── */
+#numrow {
+  display: flex;
+  height: 42px; flex-shrink: 0;
+  background: #141414;
+  border-top: 1px solid #222;
+  align-items: center;
   overflow-x: auto; overflow-y: hidden;
-  scrollbar-width: none; gap: 2px; padding: 2px 3px;
+  scrollbar-width: none;
+  gap: 2px; padding: 4px 4px;
+  padding-bottom: max(4px, env(safe-area-inset-bottom, 4px));
 }
-#symbols::-webkit-scrollbar { display: none; }
+#numrow::-webkit-scrollbar { display: none; }
 
-/* key styles */
+/* ── Key buttons ──────────────────────────────────────────── */
 .k {
   display: inline-flex; align-items: center; justify-content: center;
-  min-width: 38px; height: 32px; padding: 0 5px;
-  background: var(--key); border: 1px solid var(--key-border);
-  border-radius: 4px; font-size: 11px; font-weight: bold;
+  min-width: 48px; height: 34px; flex: 1;
+  background: #2a2a2a;
+  border: 1px solid #3a3a3a;
+  border-bottom: 2px solid #111;
+  border-radius: 4px;
+  font-size: 12px; font-weight: 700;
   font-family: 'Courier New', Courier, monospace;
-  color: #bbb; cursor: pointer; flex-shrink: 0;
-  user-select: none; -webkit-user-select: none;
-  touch-action: manipulation;
-  -webkit-tap-highlight-color: transparent;
-}
-.k:active, .k.p { background: #1a1a1a; color: var(--green); border-color: #004400; }
-.k.sp { color: var(--cyan); border-color: #002222; background: #050f0f; min-width: 44px; }
-.k.sp:active, .k.sp.p { background: #081515; color: #fff; border-color: var(--cyan); }
-.k.ar { font-size: 15px; color: #777; min-width: 34px; }
-.k.ar:active, .k.ar.p { color: var(--green); border-color: #004400; }
-.k.nm { color: var(--green); background: #040d04; border-color: #0a1a0a; min-width: 32px; font-size: 12px; }
-.k.nm:active, .k.nm.p { background: #071007; border-color: var(--green); }
-
-/* ── Visible input bar ────────────────────────────────────────────── */
-#inputbar {
-  display: flex; align-items: center;
-  height: 44px; flex-shrink: 0;
-  background: #0a0a0a;
-  border-top: 1px solid #1a1a1a;
-  padding: 0 6px; gap: 6px;
-  padding-bottom: env(safe-area-inset-bottom, 0);
-}
-#prompt-sign {
-  color: var(--green); font-size: 14px; font-weight: bold;
-  flex-shrink: 0; padding: 0 4px;
-  font-family: 'Courier New', Courier, monospace;
-}
-#cmd-input {
-  flex: 1;
-  background: #111; border: 1px solid #222; border-radius: 4px;
-  color: var(--green); caret-color: var(--green);
-  font-family: 'Courier New', Courier, monospace;
-  font-size: 16px; /* 16px prevents iOS zoom */
-  padding: 6px 8px; outline: none;
-  -webkit-appearance: none; appearance: none;
-  autocorrect: off; autocapitalize: none; spellcheck: false;
-}
-#cmd-input::placeholder { color: #333; }
-#cmd-input:focus { border-color: #003300; }
-#send-btn {
-  background: #0a1a0a; border: 1px solid #003300;
-  border-radius: 4px; color: var(--green);
-  font-size: 18px; width: 36px; height: 32px;
-  display: flex; align-items: center; justify-content: center;
+  color: #ddd;
   cursor: pointer; flex-shrink: 0;
   user-select: none; -webkit-user-select: none;
   touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+  transition: background .08s, color .08s;
 }
-#send-btn:active { background: #112211; border-color: var(--green); }
+.k:active {
+  background: #3a3a3a; color: #fff;
+  border-bottom-width: 1px;
+}
+
+/* Number keys — green tint like Termux */
+.k.num {
+  background: #1a2a1a;
+  border-color: #2a3a2a;
+  border-bottom-color: #0a100a;
+  color: #88ff88;
+  font-size: 13px;
+}
+.k.num:active { background: #243424; color: #aaffaa; }
+
+/* Modifier keys (CTRL, ALT) */
+.k.mod {
+  background: #1a1a2a;
+  border-color: #2a2a3a;
+  color: #88aaff;
+}
+.k.mod:active { background: #242438; }
+/* Active/toggled state */
+.k.mod.on {
+  background: #2a3a5a;
+  border-color: #4466aa;
+  border-bottom-color: #223;
+  color: #aaccff;
+  box-shadow: 0 0 6px rgba(100,160,255,0.4);
+}
+
+/* Arrow keys */
+.k.arrow {
+  background: #1e1e1e;
+  border-color: #2e2e2e;
+  color: #aaa;
+  font-size: 16px;
+}
+.k.arrow:active { color: #fff; background: #282828; }
 </style>
 </head>
 <body>
 <div id="app">
-
-  <!-- Tab bar -->
-  <div id="tabbar">
-    <div id="btn-add">+</div>
+  <div id="terminal">
+    <div class="tinner" id="tinner"></div>
   </div>
 
-  <!-- Terminal output -->
-  <div id="terms"></div>
-
-  <!-- Special keys -->
-  <div id="specials">
-    <div class="k sp" data-s="esc">ESC</div>
-    <div class="k sp" data-s="tab">TAB</div>
-    <div class="k sp" data-s="ctrl-c">C-c</div>
-    <div class="k sp" data-s="ctrl-d">C-d</div>
-    <div class="k sp" data-s="ctrl-z">C-z</div>
-    <div class="k sp" data-s="ctrl-l">C-l</div>
-    <div class="k sp" data-s="ctrl-a">C-a</div>
-    <div class="k sp" data-s="ctrl-e">C-e</div>
-    <div class="k sp" data-s="ctrl-k">C-k</div>
-    <div class="k sp" data-s="ctrl-u">C-u</div>
-    <div class="k sp" data-s="ctrl-w">C-w</div>
-    <div class="k sp" data-s="ctrl-r">C-r</div>
-    <div class="k ar" data-s="up">↑</div>
-    <div class="k ar" data-s="down">↓</div>
-    <div class="k ar" data-s="left">←</div>
-    <div class="k ar" data-s="right">→</div>
+  <!-- Termux-style extra key row -->
+  <div id="keybar">
+    <div class="k"      id="k-esc">ESC</div>
+    <div class="k"      id="k-tab">&#8677;</div>
+    <div class="k mod"  id="k-ctrl">CTRL</div>
+    <div class="k mod"  id="k-alt">ALT</div>
+    <div class="k"      id="k-dash">-</div>
+    <div class="k arrow" id="k-up">↑</div>
+    <div class="k arrow" id="k-down">↓</div>
+    <div class="k arrow" id="k-left">←</div>
+    <div class="k arrow" id="k-right">→</div>
   </div>
 
-  <!-- Number / symbol row -->
-  <div id="symbols">
-    <div class="k nm" data-i="1">1</div>
-    <div class="k nm" data-i="2">2</div>
-    <div class="k nm" data-i="3">3</div>
-    <div class="k nm" data-i="4">4</div>
-    <div class="k nm" data-i="5">5</div>
-    <div class="k nm" data-i="6">6</div>
-    <div class="k nm" data-i="7">7</div>
-    <div class="k nm" data-i="8">8</div>
-    <div class="k nm" data-i="9">9</div>
-    <div class="k nm" data-i="0">0</div>
-    <div class="k" data-i="-">-</div>
-    <div class="k" data-i="_">_</div>
-    <div class="k" data-i="/">/</div>
-    <div class="k" data-i="|">|</div>
-    <div class="k" data-i="&amp;">&amp;</div>
-    <div class="k" data-i="~">~</div>
-    <div class="k" data-i="`">`</div>
-    <div class="k" data-i="$">$</div>
-    <div class="k" data-i="@">@</div>
-    <div class="k" data-i="#">#</div>
-    <div class="k" data-i="!">!</div>
-    <div class="k" data-i="*">*</div>
-    <div class="k" data-i="(">( </div>
-    <div class="k" data-i=")">)</div>
-    <div class="k" data-i="[">[ </div>
-    <div class="k" data-i="]">]</div>
-    <div class="k" data-i="{">{</div>
-    <div class="k" data-i="}">}</div>
-    <div class="k" data-i="&quot;">"</div>
-    <div class="k" data-i="'">'</div>
-    <div class="k" data-i=";">;</div>
-    <div class="k" data-i=":">:</div>
-    <div class="k" data-i=",">,</div>
-    <div class="k" data-i=".">.</div>
-    <div class="k" data-i="=">=</div>
-    <div class="k" data-i=" ">SPC</div>
+  <!-- Number row -->
+  <div id="numrow">
+    <div class="k num" data-i="1">1</div>
+    <div class="k num" data-i="2">2</div>
+    <div class="k num" data-i="3">3</div>
+    <div class="k num" data-i="4">4</div>
+    <div class="k num" data-i="5">5</div>
+    <div class="k num" data-i="6">6</div>
+    <div class="k num" data-i="7">7</div>
+    <div class="k num" data-i="8">8</div>
+    <div class="k num" data-i="9">9</div>
+    <div class="k num" data-i="0">0</div>
   </div>
-
-  <!-- Visible input bar -->
-  <div id="inputbar">
-    <span id="prompt-sign">$</span>
-    <input id="cmd-input" type="text"
-      placeholder="type command here..."
-      autocomplete="off" autocorrect="off"
-      autocapitalize="none" spellcheck="false"
-      inputmode="text"/>
-    <div id="send-btn">↵</div>
-  </div>
-
 </div>
-<script>
-// ─── state ──────────────────────────────────────────────────────────
-var tabs = [], activeId = null, tabN = 0;
 
-// ─── theme ──────────────────────────────────────────────────────────
+<script>
+'use strict';
+
+// ── Kali / Termux colour theme ────────────────────────────────────────────────
 var THEME = {
   background:          '#000000',
-  foreground:          '#eeeeee',
-  cursor:              '#00ff00',
+  foreground:          '#f8f8f2',
+  cursor:              '#00ff41',
   cursorAccent:        '#000000',
-  selectionBackground: 'rgba(0,255,0,0.2)',
-  black:    '#000',    red:     '#ff5555',
-  green:    '#55ff55', yellow:  '#ffff55',
-  blue:     '#5599ff', magenta: '#ff55ff',
-  cyan:     '#55ffff', white:   '#eeeeee',
-  brightBlack:    '#555',     brightRed:     '#ff8888',
-  brightGreen:    '#88ff88',  brightYellow:  '#ffff88',
-  brightBlue:     '#88aaff',  brightMagenta: '#ff88ff',
-  brightCyan:     '#88ffff',  brightWhite:   '#ffffff',
+  selectionBackground: 'rgba(100,200,100,0.25)',
+  black:   '#000000', red:     '#ff5555',
+  green:   '#55ff55', yellow:  '#f1fa8c',
+  blue:    '#6272a4', magenta: '#ff79c6',
+  cyan:    '#8be9fd', white:   '#f8f8f2',
+  brightBlack:   '#555555', brightRed:     '#ff6e6e',
+  brightGreen:   '#69ff47', brightYellow:  '#ffffa5',
+  brightBlue:    '#d6acff', brightMagenta: '#ff92df',
+  brightCyan:    '#a4ffff', brightWhite:   '#ffffff',
 };
 
-// ─── key map ────────────────────────────────────────────────────────
-var KMAP = {
-  esc:'\x1b', tab:'\t',
-  'ctrl-c':'\x03','ctrl-d':'\x04','ctrl-z':'\x1a',
-  'ctrl-l':'\x0c','ctrl-a':'\x01','ctrl-e':'\x05',
-  'ctrl-k':'\x0b','ctrl-u':'\x15','ctrl-w':'\x17','ctrl-r':'\x12',
-  up:'\x1b[A',down:'\x1b[B',right:'\x1b[C',left:'\x1b[D',
-};
+// ── Modifier state ─────────────────────────────────────────────────────────────
+var ctrlOn = false;
+var altOn  = false;
 
-// ─── active helper ──────────────────────────────────────────────────
-function cur() { return tabs.find(function(t){ return t.id === activeId; }); }
-
-// ─── send to shell ──────────────────────────────────────────────────
-function send(str) {
-  var t = cur();
-  if (t) t.socket.emit('input', str);
+function setCtrl(v) {
+  ctrlOn = v;
+  document.getElementById('k-ctrl').classList.toggle('on', v);
+}
+function setAlt(v) {
+  altOn = v;
+  document.getElementById('k-alt').classList.toggle('on', v);
 }
 
-// ─── create tab ─────────────────────────────────────────────────────
-function newTab() {
-  tabN++;
-  var id = 'T' + tabN;
+// ── xterm setup ───────────────────────────────────────────────────────────────
+var term = new Terminal({
+  cursorBlink:       true,
+  cursorStyle:       'block',
+  fontSize:          14,
+  fontFamily:        '"Courier New", Courier, monospace',
+  lineHeight:        1.2,
+  scrollback:        50000,
+  allowTransparency: true,
+  theme:             THEME,
+  disableStdin:      false,
+  convertEol:        false,
+  macOptionIsMeta:   true,
+});
 
-  // pane
-  var pane = document.createElement('div');
-  pane.className = 'pane'; pane.id = 'pane-' + id;
-  var inner = document.createElement('div');
-  inner.className = 'tinner'; inner.id = 'inner-' + id;
-  pane.appendChild(inner);
-  document.getElementById('terms').appendChild(pane);
+var fit = new FitAddon.FitAddon();
+term.loadAddon(fit);
+term.open(document.getElementById('tinner'));
 
-  // tab button (before + button)
-  var addBtn = document.getElementById('btn-add');
-  var tabEl = document.createElement('div');
-  tabEl.className = 'tab'; tabEl.id = 'tab-' + id;
-  tabEl.innerHTML =
-    '<div class="dot"></div>' +
-    '<span class="lbl">bash:' + tabN + '</span>' +
-    '<span class="x" data-id="' + id + '">✕</span>';
-  tabEl.addEventListener('click', function(e) {
-    if (e.target.classList.contains('x')) return;
-    showTab(id);
-  });
-  tabEl.querySelector('.x').addEventListener('click', function(){ killTab(id); });
-  document.getElementById('tabbar').insertBefore(tabEl, addBtn);
+// Intercept key events for CTRL/ALT modifier handling
+term.attachCustomKeyEventHandler(function(e) {
+  if (e.type !== 'keydown') return true;
 
-  // xterm
-  var term = new Terminal({
-    cursorBlink:       true,
-    cursorStyle:       'block',
-    fontSize:          14,
-    fontFamily:        '"Courier New", Courier, monospace',
-    lineHeight:        1.25,
-    scrollback:        50000,
-    allowTransparency: true,
-    theme:             THEME,
-    disableStdin:      false,
-    convertEol:        false,
-  });
-  var fit = new FitAddon.FitAddon();
-  term.loadAddon(fit);
-  term.open(inner);
-
-  // socket
-  var socket = io({ transports: ['websocket', 'polling'], reconnectionAttempts: 10 });
-  var tabDot = tabEl.querySelector('.dot');
-
-  socket.on('connect', function() {
-    tabDot.style.background = '#00ff00';
-    try { fit.fit(); socket.emit('resize', { cols: term.cols, rows: term.rows }); } catch(e) {}
-    focusInput();
-  });
-  socket.on('disconnect', function() { tabDot.style.background = '#ff4444'; });
-  socket.on('output', function(data) { term.write(data); });
-
-  // xterm keystrokes → socket (for vim/nano etc when terminal has focus)
-  term.onData(function(data) { socket.emit('input', data); });
-
-  var doFit = function() {
-    if (activeId !== id) return;
-    try { fit.fit(); socket.emit('resize', { cols: term.cols, rows: term.rows }); } catch(e) {}
-  };
-  setTimeout(doFit, 80);
-  var ro = new ResizeObserver(doFit);
-  ro.observe(inner);
-
-  // tap terminal → focus input bar
-  pane.addEventListener('click', focusInput);
-  pane.addEventListener('touchend', function(e) { focusInput(); }, { passive: true });
-
-  var obj = { id: id, term: term, fit: fit, socket: socket, pane: pane, tabEl: tabEl, ro: ro };
-  tabs.push(obj);
-  showTab(id);
-  return obj;
-}
-
-// ─── switch / close ──────────────────────────────────────────────────
-function showTab(id) {
-  activeId = id;
-  tabs.forEach(function(t) {
-    var on = t.id === id;
-    t.pane.classList.toggle('active', on);
-    t.tabEl.classList.toggle('active', on);
-    if (on) setTimeout(function() {
-      try { t.fit.fit(); t.socket.emit('resize', { cols: t.term.cols, rows: t.term.rows }); } catch(e) {}
-    }, 50);
-  });
-  var el = document.getElementById('tab-' + id);
-  if (el) el.scrollIntoView({ behavior: 'smooth', inline: 'nearest' });
-  focusInput();
-}
-
-function killTab(id) {
-  if (tabs.length <= 1) return;
-  var idx = tabs.findIndex(function(t) { return t.id === id; });
-  if (idx < 0) return;
-  var t = tabs[idx];
-  try { t.socket.disconnect(); } catch(e) {}
-  t.ro.disconnect();
-  t.pane.remove(); t.tabEl.remove();
-  tabs.splice(idx, 1);
-  if (activeId === id) showTab(tabs[Math.min(idx, tabs.length - 1)].id);
-}
-
-// ─── input bar ───────────────────────────────────────────────────────
-var cmdInput = document.getElementById('cmd-input');
-var sendBtn  = document.getElementById('send-btn');
-
-function focusInput() {
-  // small delay needed on iOS after touch events
-  setTimeout(function() { cmdInput.focus(); }, 60);
-}
-
-// Send each character as typed (real-time, like a real terminal)
-cmdInput.addEventListener('input', function() {
-  // get what was just typed (diff from last value)
-  var val = cmdInput.value;
-  if (val.length > 0) {
-    send(val);
-    cmdInput.value = '';
+  if (ctrlOn) {
+    var key = e.key;
+    // Single printable character — apply ctrl
+    if (key.length === 1) {
+      var upper = key.toUpperCase();
+      var code  = upper.charCodeAt(0) - 64;
+      if (code >= 1 && code <= 26) {
+        socket.emit('input', String.fromCharCode(code));
+      } else {
+        socket.emit('input', key);
+      }
+      setCtrl(false);
+      return false;
+    }
+    // Special keys while CTRL on
+    if (key === 'Enter')     { socket.emit('input', '\x0d'); setCtrl(false); return false; }
+    if (key === 'Backspace') { socket.emit('input', '\x08'); setCtrl(false); return false; }
   }
+
+  if (altOn) {
+    var key2 = e.key;
+    if (key2.length === 1) {
+      socket.emit('input', '\x1b' + key2);
+      setAlt(false);
+      return false;
+    }
+    if (key2 === 'Enter') { socket.emit('input', '\x1b\x0d'); setAlt(false); return false; }
+  }
+
+  return true; // let xterm handle normally
 });
 
-// Special key handling in the input
-cmdInput.addEventListener('keydown', function(e) {
-  if (e.key === 'Enter') {
-    e.preventDefault();
-    send('\r');
-    cmdInput.value = '';
-  } else if (e.key === 'Backspace') {
-    e.preventDefault();
-    send('\x7f');
-    cmdInput.value = '';
-  } else if (e.key === 'Tab') {
-    e.preventDefault();
-    send('\t');
-  } else if (e.key === 'Escape') {
-    e.preventDefault();
-    send('\x1b');
-  } else if (e.ctrlKey && e.key.length === 1) {
-    e.preventDefault();
-    send(String.fromCharCode(e.key.toUpperCase().charCodeAt(0) - 64));
-  }
+// Forward all terminal input to socket
+term.onData(function(data) {
+  socket.emit('input', data);
 });
 
-// Send button
-sendBtn.addEventListener('click', function() { send('\r'); cmdInput.value = ''; focusInput(); });
-sendBtn.addEventListener('touchend', function(e) { e.preventDefault(); send('\r'); cmdInput.value = ''; focusInput(); });
+// ── Socket ────────────────────────────────────────────────────────────────────
+var socket = io({ transports: ['websocket', 'polling'], reconnectionAttempts: 15 });
 
-// ─── toolbar key handler ─────────────────────────────────────────────
-function handleK(el) {
-  var s = el.dataset.s, i = el.dataset.i;
-  if (s !== undefined) send(KMAP[s] || '');
-  else if (i !== undefined) {
-    // insert symbol into input then send it
-    send(i);
-  }
-  focusInput();
+socket.on('connect', function() {
+  try { fit.fit(); socket.emit('resize', { cols: term.cols, rows: term.rows }); } catch(e) {}
+  term.focus();
+});
+
+socket.on('output', function(data) {
+  term.write(data);
+});
+
+socket.on('disconnect', function() {
+  term.write('\r\n\x1b[31m[disconnected — reconnecting…]\x1b[0m\r\n');
+});
+
+// ── Resize ────────────────────────────────────────────────────────────────────
+function doFit() {
+  try { fit.fit(); socket.emit('resize', { cols: term.cols, rows: term.rows }); } catch(e) {}
 }
 
-document.querySelectorAll('.k').forEach(function(el) {
-  el.addEventListener('touchstart', function(e) {
-    e.preventDefault();
-    el.classList.add('p');
-    handleK(el);
-  }, { passive: false });
-  el.addEventListener('touchend', function() { el.classList.remove('p'); }, { passive: true });
-  el.addEventListener('mousedown', function(e) { e.preventDefault(); el.classList.add('p'); handleK(el); });
-  el.addEventListener('mouseup',   function() { el.classList.remove('p'); });
-});
+var ro = new ResizeObserver(doFit);
+ro.observe(document.getElementById('tinner'));
 
-// ─── new tab button ───────────────────────────────────────────────────
-document.getElementById('btn-add').addEventListener('click', newTab);
-document.getElementById('btn-add').addEventListener('touchend', function(e) { e.preventDefault(); newTab(); });
-
-// ─── global resize ────────────────────────────────────────────────────
-window.addEventListener('resize', function() {
-  var t = cur(); if (!t) return;
-  try { t.fit.fit(); t.socket.emit('resize', { cols: t.term.cols, rows: t.term.rows }); } catch(e) {}
-});
-
-// handle iOS visual viewport (keyboard open/close)
+window.addEventListener('resize', doFit);
 if (window.visualViewport) {
-  window.visualViewport.addEventListener('resize', function() {
-    var t = cur(); if (!t) return;
-    try { t.fit.fit(); t.socket.emit('resize', { cols: t.term.cols, rows: t.term.rows }); } catch(e) {}
-  });
+  window.visualViewport.addEventListener('resize', doFit);
 }
 
-// ─── start ────────────────────────────────────────────────────────────
-newTab();
+// ── Tap terminal to open keyboard ─────────────────────────────────────────────
+document.getElementById('terminal').addEventListener('click', function() {
+  term.focus();
+});
+document.getElementById('terminal').addEventListener('touchend', function(e) {
+  if (window.getSelection && window.getSelection().toString()) return;
+  e.preventDefault();
+  term.focus();
+}, { passive: false });
+
+// ── Key bar actions ───────────────────────────────────────────────────────────
+function bindKey(id, action) {
+  var el = document.getElementById(id);
+  if (!el) return;
+
+  function trigger(e) {
+    e.preventDefault();
+    el.classList.add('active-flash');
+    setTimeout(function() { el.classList.remove('active-flash'); }, 120);
+    action();
+  }
+
+  el.addEventListener('touchstart', trigger, { passive: false });
+  el.addEventListener('mousedown',  trigger, false);
+}
+
+bindKey('k-esc',   function() { socket.emit('input', '\x1b');   term.focus(); });
+bindKey('k-tab',   function() { socket.emit('input', '\t');     term.focus(); });
+bindKey('k-dash',  function() { socket.emit('input', '-');      term.focus(); });
+bindKey('k-up',    function() { socket.emit('input', '\x1b[A'); term.focus(); });
+bindKey('k-down',  function() { socket.emit('input', '\x1b[B'); term.focus(); });
+bindKey('k-left',  function() { socket.emit('input', '\x1b[D'); term.focus(); });
+bindKey('k-right', function() { socket.emit('input', '\x1b[C'); term.focus(); });
+
+// CTRL / ALT toggles
+bindKey('k-ctrl', function() {
+  setAlt(false);
+  setCtrl(!ctrlOn);
+  term.focus();
+});
+bindKey('k-alt', function() {
+  setCtrl(false);
+  setAlt(!altOn);
+  term.focus();
+});
+
+// Number row
+document.querySelectorAll('#numrow .k').forEach(function(el) {
+  function triggerNum(e) {
+    e.preventDefault();
+    var ch = el.dataset.i;
+    if (ctrlOn) {
+      // CTRL + number — send the digit
+      socket.emit('input', ch);
+      setCtrl(false);
+    } else {
+      socket.emit('input', ch);
+    }
+    term.focus();
+  }
+  el.addEventListener('touchstart', triggerNum, { passive: false });
+  el.addEventListener('mousedown',  triggerNum, false);
+});
+
+// ── Boot ──────────────────────────────────────────────────────────────────────
+setTimeout(function() { doFit(); term.focus(); }, 100);
 </script>
 </body>
 </html>
