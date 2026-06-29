@@ -1,0 +1,25 @@
+kind = "api"
+previewPath = "/"
+title = "KaliTerm"
+version = "1.0.0"
+id = "3B4_FFSkEVBkAeYMFRJ2e"
+
+[[services]]
+localPort = 8080
+name = "KaliTerm"
+paths = ["/"]
+
+[services.development]
+run = "PORT=8080 node /home/runner/workspace/artifacts/api-server/server.js"
+
+[services.production]
+
+[services.production.build]
+args = ["echo", "no build step"]
+
+[services.production.run]
+args = ["node", "/home/runner/workspace/artifacts/api-server/server.js"]
+
+[services.production.run.env]
+PORT = "8080"
+NODE_ENV = "production"
