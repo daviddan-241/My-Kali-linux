@@ -576,7 +576,7 @@ function spawnShell(token, cols = 220, rows = 50) {
     TERM: "xterm-256color", COLORTERM: "truecolor",
     LANG: "en_US.UTF-8", LC_ALL: "C.UTF-8",
     DEBIAN_FRONTEND: "noninteractive",
-    HOME: home, ALL_PROXY: `socks5://127.0.0.1:${TOR_SOCKS_PORT}`,
+    HOME: home, ...(torReady ? { ALL_PROXY: `socks5://127.0.0.1:${TOR_SOCKS_PORT}` } : {}),
   };
 
   /* ── tmux-backed persistent session ── */
