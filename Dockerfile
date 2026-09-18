@@ -73,20 +73,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # ── 11. Python 3 + hacking libraries ──────────────────────────────────────────
 RUN apt-get update && apt-get install -y --no-install-recommends \
     python3 python3-pip python3-venv python3-dev python3-setuptools build-essential cmake \
-    && pip3 install --break-system-packages \
-        impacket \
-        pwntools \
-        volatility3 \
-        scapy \
-        requests \
-        beautifulsoup4 \
-        paramiko \
-        cryptography \
-        colorama \
-        python-nmap \
-        shodan \
-        dnspython \
-        sslyze \
+    && pip3 install --break-system-packages "unicorn==2.0.1.post1" \
+    && for p in impacket pwntools volatility3 scapy requests beautifulsoup4 paramiko cryptography colorama python-nmap shodan dnspython sslyze; do \
+        pip3 install --break-system-packages "$p" 2>/dev/null || echo "[warn] pip install failed: $p"; \
+    done \
     && rm -rf /var/lib/apt/lists/* /root/.cache/pip
 
 # ── 12. Ruby + wpscan ─────────────────────────────────────────────────────────
