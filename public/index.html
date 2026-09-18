@@ -1379,6 +1379,38 @@ async function sendChunked(text){
   for(var i=0;i<text.length;i+=512){send(text.slice(i,i+512));await new Promise(function(r){setTimeout(r,8);});}
 }
 
+
+/* ══ COMMAND HISTORY PERSISTENCE ══ */
+var cmdHistory = (function(){
+  try { return JSON.parse(localStorage.getItem('kali_cmd_hist') || '[]'); }
+  catch(_) { return []; }
+})();
+var cmdHistIndex = -1;
+
+function addCmdHistory(cmd){
+  if(!cmd) return;
+  cmd = cmd.trim();
+  if(!cmd) return;
+  var idx = cmdHistory.indexOf(cmd);
+  if(idx !== -1) cmdHistory.splice(idx, 1);
+  cmdHistory.push(cmd);
+  if(cmdHistory.length > 200) cmdHistory.shift();
+  try { localStorage.setItem('kali_cmd_hist', JSON.stringify(cmdHistory)); } catch(_){}
+  cmdHistIndex = cmdHistory.length;
+}
+
+/* Visibility change & reconnect listener for backgrounding */
+document.addEventListener('visibilitychange', function(){
+  if(!document.hidden){
+    sessions.forEach(function(s){
+      if(s.sock && !s.sock.connected){
+        s.sock.connect();
+      }
+    });
+    if(typeof resizeApp === 'function') resizeApp();
+  }
+});
+
 /* ══ AI SUGGEST BAR ══ */
 var _aiBarTimer=null;
 function showAiBar(d){
