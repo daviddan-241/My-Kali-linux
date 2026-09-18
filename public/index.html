@@ -1496,7 +1496,10 @@ kbtn('kdot',function(){send('.');});
 kbtn('kai',function(){openSheet('ai-overlay','ai-sheet','ai-prompt');});
 kbtn('kpaste',function(){
   if(navigator.clipboard&&navigator.clipboard.readText){
-    navigator.clipboard.readText().then(function(t){if(t)document.getElementById('paste-txt').value=t;openSheet('paste-overlay','paste-sheet','paste-txt');}).catch(function(){openSheet('paste-overlay','paste-sheet','paste-txt');});
+    navigator.clipboard.readText().then(function(t){
+      if(t) sendChunked(t);
+      else openSheet('paste-overlay','paste-sheet','paste-txt');
+    }).catch(function(){openSheet('paste-overlay','paste-sheet','paste-txt');});
   }else openSheet('paste-overlay','paste-sheet','paste-txt');
 });
 kbtn('ktoolkit',function(){openDrawer();});
@@ -1989,6 +1992,33 @@ document.getElementById('git-push-btn').addEventListener('click',function(){
   }).catch(function(e){outEl.textContent='Error: '+e.message;outEl.style.display='block';})
   .finally(function(){btn.textContent='Push';btn.disabled=false;});
 });
+
+
+/* ══ CLIPBOARD & PASTE HANDLERS ══ */
+term.attachCustomKeyEventHandler(function(e){
+  if(e.type==='keydown'&&(e.metaKey||e.ctrlKey)&&(e.key==='v'||e.key==='V')){
+    if(navigator.clipboard&&navigator.clipboard.readText){
+      navigator.clipboard.readText().then(function(t){
+        if(t)sendChunked(t);
+      }).catch(function(){openSheet('paste-overlay','paste-sheet','paste-txt');});
+    }else{openSheet('paste-overlay','paste-sheet','paste-txt');}
+    return false;
+  }
+  return true;
+});
+
+function handlePasteEvent(e){
+  var active=document.activeElement;
+  if(active&&active.tagName==='TEXTAREA'&&active.id!=='kb'&&active.id!=='kb2')return;
+  if(active&&active.tagName==='INPUT')return;
+  var pasted=(e.clipboardData||window.clipboardData)?(e.clipboardData||window.clipboardData).getData('text'):'';
+  if(pasted){
+    e.preventDefault();
+    sendChunked(pasted);
+  }
+}
+window.addEventListener('paste',handlePasteEvent);
+kbEl.addEventListener('paste',handlePasteEvent);
 
 /* ══ PASTE ══ */
 document.getElementById('paste-send').addEventListener('click',function(){
