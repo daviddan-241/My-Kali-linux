@@ -1,0 +1,8 @@
+# Render Blueprint for KaliTerm (web terminal + Tor)
+services:
+  - type: web
+    name: my-kali-linux
+    runtime: docker
+    plan: free
+    autoDeploy: true
+    healthCheckPath: /
