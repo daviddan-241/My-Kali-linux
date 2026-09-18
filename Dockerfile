@@ -72,7 +72,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 # ── 11. Python 3 + hacking libraries ──────────────────────────────────────────
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    python3 python3-pip python3-venv python3-dev python3-setuptools \
+    python3 python3-pip python3-venv python3-dev python3-setuptools build-essential cmake \
     && pip3 install --break-system-packages \
         impacket \
         pwntools \

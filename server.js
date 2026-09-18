@@ -91,7 +91,7 @@ echo ""
 fs.chmodSync(INIT_FILE, 0o755);
 
 /* ── Session store ── */
-const IDLE_MS  = 30 * 60 * 1000;   // 30-min idle → kill PTY
+const IDLE_MS  = 12 * 60 * 60 * 1000;  // 12h idle → kill PTY (survive backgrounding)
 const BUF_MAX  = 131072;            // 128 KB replay buffer per session
 const sessions = new Map();
 
