@@ -358,7 +358,7 @@ html,body{
 }
 .sheet-body{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:4px 14px 14px;}
 .sheet-inp{
-  width:100%;padding:10px 12px;border-radius:10px;font-size:14px;
+  width:100%;padding:10px 12px;border-radius:10px;font-size:16px;
   border:1px solid var(--border);background:var(--input-bg);color:var(--fg);
   outline:none;-webkit-appearance:none;
   font-family:-apple-system,system-ui,sans-serif;
@@ -436,7 +436,7 @@ html,body{
 }
 .cat-pill.on{background:var(--accent);color:#fff;border-color:var(--accent);}
 #rename-sheet-inp{
-  width:100%;padding:10px 12px;border-radius:10px;font-size:14px;
+  width:100%;padding:10px 12px;border-radius:10px;font-size:16px;
   border:1px solid var(--border);background:var(--input-bg);color:var(--fg);
   outline:none;-webkit-appearance:none;font-family:monospace;margin-bottom:8px;
 }
@@ -1155,18 +1155,17 @@ var _fitTimer=null;
 function resizeApp(){
   var vv=window.visualViewport;
   var h=vv?vv.height:window.innerHeight;
-  /* clamp: always at least 200px so terminal never goes zero-height */
   if(h<200)h=200;
   var app=document.getElementById('app');
   app.style.height=h+'px';
-  /* If viewport has scrolled (e.g. iOS focus scroll), adjust top offset */
+  if(window.scrollY!==0||window.scrollX!==0){window.scrollTo(0,0);}
   if(vv&&vv.offsetTop>0){
     app.style.top=vv.offsetTop+'px';
   } else {
     app.style.top='0px';
   }
   clearTimeout(_fitTimer);
-  _fitTimer=setTimeout(doFit,200);
+  _fitTimer=setTimeout(doFit,100);
 }
 resizeApp();
 if(window.visualViewport){
