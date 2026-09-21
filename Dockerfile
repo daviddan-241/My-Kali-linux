@@ -106,6 +106,19 @@ RUN for bin in /usr/lib/nmap/nmap /usr/bin/nmap /usr/bin/hping3 \
          > /usr/bin/nmap \
     && chmod +x /usr/bin/nmap
 
+# ── 14b. Extra tools (premium update) ────────────────────────────────────────
+RUN apt-get update && for t in feroxbuster netexec nuclei sherlock amass httpie testssl.sh theharvester fastfetch figlet zsh; do \
+    apt-get install -y --no-install-recommends "$t" 2>/dev/null || echo "[warn] apt install failed: $t"; \
+    done \
+    && apt-get clean
+
+# ── 14c. Ollama runtime (local LLMs; models pull at runtime) ─────────────────
+RUN (set -e; curl -fsSL https://ollama.com/download/ollama-linux-amd64.tgz -o /tmp/ol.tgz \
+    && tar -xzf /tmp/ol.tgz -C /usr \
+    && chmod +x /usr/bin/ollama \
+    && rm -f /tmp/ol.tgz) \
+    || echo "[warn] ollama install skipped"
+
 # ── 15. Node.js 20 ───────────────────────────────────────────────────────────
 RUN curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
     && apt-get install -y nodejs build-essential \

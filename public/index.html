@@ -19,67 +19,67 @@ html,body{
   background:#000;overflow:hidden;
   -webkit-text-size-adjust:100%;
   -webkit-tap-highlight-color:transparent;
+  font-family:-apple-system,BlinkMacSystemFont,'SF Pro Text',system-ui,sans-serif;
 }
 
-/* ─── App shell: position:fixed + JS height keeps keybar above keyboard ─── */
+/* ─── App shell ─── */
 #app{
   position:fixed;
   top:0;left:0;right:0;
-  /* height set by resizeToVV() */
   display:flex;flex-direction:column;
   background:#000;
 }
 
-/* ─── Tab bar ─── */
+/* ─── Tab bar — translucent blur, floating pills ─── */
 #tabbar{
   display:flex;align-items:stretch;
-  min-height:38px;flex-shrink:0;
+  flex-shrink:0;
+  min-height:52px;
   padding-top:env(safe-area-inset-top,0px);
-  background:#0c0d0e;
-  border-bottom:1px solid #1a1a1a;
-  overflow:hidden;
+  background:rgba(14,16,19,0.85);
+  -webkit-backdrop-filter:saturate(180%) blur(20px);
+  backdrop-filter:saturate(180%) blur(20px);
+  border-bottom:0.5px solid rgba(255,255,255,0.08);
 }
 #menubtn{
-  flex-shrink:0;width:42px;
+  flex-shrink:0;width:46px;
   display:flex;align-items:center;justify-content:center;
-  color:#555;font-size:19px;
-  border-right:1px solid #1a1a1a;
+  color:#8e939b;font-size:20px;
   cursor:pointer;touch-action:manipulation;
   -webkit-user-select:none;user-select:none;
 }
 #tabs{
-  flex:1;display:flex;align-items:stretch;
+  flex:1;display:flex;align-items:center;gap:7px;
   overflow-x:auto;overflow-y:hidden;
   -webkit-overflow-scrolling:touch;
-  scrollbar-width:none;
+  scrollbar-width:none;padding:0 8px;
 }
 #tabs::-webkit-scrollbar{display:none;}
 .tab{
-  flex-shrink:0;display:flex;align-items:center;gap:5px;
-  padding:0 10px;min-width:74px;max-width:124px;
-  border-right:1px solid #181818;position:relative;
+  flex-shrink:0;display:flex;align-items:center;gap:6px;
+  padding:7px 13px;border-radius:999px;
+  background:rgba(255,255,255,0.055);
+  border:0.5px solid transparent;
   cursor:pointer;touch-action:manipulation;
   -webkit-user-select:none;user-select:none;
+  transition:background .18s ease,border-color .18s ease;
 }
-.tab.cur::after{
-  content:'';position:absolute;bottom:0;left:0;right:0;height:2px;
-  background:#55ff55;
-}
-.tdot{width:6px;height:6px;border-radius:50%;background:#333;flex-shrink:0;}
-.tab.live .tdot{background:#55ff55;box-shadow:0 0 4px #55ff55;}
-.tab.dead .tdot{background:#ff5555;}
+.tab.cur{background:rgba(50,215,75,0.10);border-color:rgba(50,215,75,0.35);}
+.tdot{width:7px;height:7px;border-radius:50%;background:#4a4f57;flex-shrink:0;transition:background .18s ease;}
+.tab.live .tdot{background:#32d74b;box-shadow:0 0 6px rgba(50,215,75,0.8);}
+.tab.dead .tdot{background:#ff453a;}
 .tname{
-  flex:1;font-size:11px;font-family:'Courier New',monospace;
-  color:#555;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+  font-size:12.5px;font-weight:600;color:#9aa0a8;letter-spacing:.2px;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:86px;
 }
-.tab.cur .tname{color:#55ff55;}
-.tab.unread .tname::before{content:'● ';color:#f1fa8c;font-size:8px;}
-.tx{font-size:12px;color:#2a2a2a;padding:3px 2px;flex-shrink:0;}
+.tab.cur .tname{color:#5ce65e;}
+.tab.unread .tname::before{content:'\25CF ';color:#ffd60a;font-size:8px;}
+.tx{font-size:13px;color:#5c626b;padding-left:2px;flex-shrink:0;}
+.tab.cur .tx{color:#7d828a;}
 #addtab{
-  flex-shrink:0;width:36px;
+  flex-shrink:0;width:44px;
   display:flex;align-items:center;justify-content:center;
-  color:#444;font-size:20px;line-height:1;
-  border-left:1px solid #1a1a1a;
+  color:#8e939b;font-size:22px;font-weight:300;
   cursor:pointer;touch-action:manipulation;
   -webkit-user-select:none;user-select:none;
 }
@@ -91,9 +91,9 @@ html,body{
 #term-area::before{
   content:'';position:absolute;inset:0;
   background:url('kali-bg.jpeg') center/cover no-repeat;
-  opacity:.06;pointer-events:none;z-index:0;
+  opacity:.05;pointer-events:none;z-index:0;
 }
-#tinner{position:absolute;inset:0;padding:2px 4px;z-index:1;}
+#tinner{position:absolute;inset:0;padding:4px;z-index:1;}
 .xterm,.xterm-viewport,.xterm-screen{height:100%!important;}
 .xterm-viewport{background:transparent!important;overflow-y:hidden!important;}
 
@@ -104,63 +104,123 @@ html,body{
   background:transparent;border:none;outline:none;padding:0;
   color:transparent;caret-color:transparent;
   -webkit-appearance:none;
-  /* allow vertical pan on terminal scroll */
   touch-action:pan-y;
 }
 
 /* Scroll-to-bottom pill */
 #gobot{
-  position:absolute;right:8px;bottom:8px;
-  width:30px;height:30px;border-radius:50%;
-  background:rgba(0,0,0,.8);border:1px solid rgba(85,255,85,.4);
-  color:#55ff55;font-size:13px;
+  position:absolute;right:10px;bottom:70px;
+  width:32px;height:32px;border-radius:50%;
+  background:rgba(20,22,25,0.78);
+  -webkit-backdrop-filter:blur(12px);backdrop-filter:blur(12px);
+  border:0.5px solid rgba(50,215,75,0.4);
+  color:#32d74b;font-size:13px;
   align-items:center;justify-content:center;display:none;
-  z-index:12;cursor:pointer;touch-action:manipulation;
+  z-index:13;cursor:pointer;touch-action:manipulation;
 }
 #gobot.show{display:flex;}
 
 /* Live badge */
 #badge{
-  position:absolute;top:5px;right:8px;z-index:12;
-  font-size:9px;letter-spacing:1px;font-family:'Courier New',monospace;
+  position:absolute;top:7px;right:12px;z-index:12;
+  font-size:10px;font-weight:600;letter-spacing:1.2px;
   pointer-events:none;
 }
-#badge.on{color:#44aa44;}
-#badge.off{color:#ff4444;}
+#badge.on{color:#30d158;}
+#badge.off{color:#ff453a;}
 
-/* ─── Key bar — always visible above keyboard via JS ─── */
+/* ─── Side rail — premium expandable keyboard toggle ─── */
+#rail{
+  position:absolute;right:10px;bottom:12px;z-index:14;
+  width:46px;height:46px;border-radius:15px;
+  background:rgba(22,24,28,0.80);
+  -webkit-backdrop-filter:saturate(180%) blur(18px);
+  backdrop-filter:saturate(180%) blur(18px);
+  border:0.5px solid rgba(255,255,255,0.14);
+  display:flex;align-items:center;justify-content:center;
+  color:#c7ccd4;font-size:19px;
+  cursor:pointer;touch-action:manipulation;
+  -webkit-user-select:none;user-select:none;
+  transition:transform .18s ease,border-color .18s ease,color .18s ease;
+}
+#rail:active{transform:scale(0.92);}
+#rail.on{color:#32d74b;border-color:rgba(50,215,75,0.5);}
+
+/* ─── Expandable key rows ─── */
+#xkeys{
+  flex-shrink:0;overflow:hidden;max-height:0;
+  transition:max-height .28s cubic-bezier(.32,.72,.35,1);
+  background:rgba(12,13,15,0.95);
+}
+#xkeys.open{max-height:170px;}
+.xkrow{display:flex;gap:4px;padding:5px 6px;}
+.xk{
+  flex:1;min-width:0;height:44px;
+  display:flex;align-items:center;justify-content:center;
+  background:rgba(255,255,255,0.065);border:none;border-radius:10px;
+  font-size:13px;font-weight:600;color:#dfe3e8;
+  font-family:ui-monospace,'SF Mono',Menlo,monospace;
+  touch-action:manipulation;cursor:pointer;
+  -webkit-user-select:none;user-select:none;
+  -webkit-tap-highlight-color:transparent;
+  transition:background .12s ease;
+}
+.xk:active,.xk.flash{background:rgba(50,215,75,0.22);}
+.xk.tool{color:#9ecbff;}
+
+/* ─── Key bar ─── */
 #keybar{
-  display:flex;align-items:stretch;
-  height:44px;flex-shrink:0;
-  background:#0c0d0e;
-  border-top:1px solid #1a1a1a;
-  padding:3px 2px;gap:2px;
-  /* safe area applied only when keyboard is closed */
-  padding-bottom:max(3px, env(safe-area-inset-bottom, 3px));
+  display:flex;align-items:stretch;gap:4px;
+  height:56px;flex-shrink:0;
+  padding:6px 6px max(6px, env(safe-area-inset-bottom, 6px));
+  background:rgba(14,16,19,0.95);
+  -webkit-backdrop-filter:saturate(180%) blur(20px);
+  backdrop-filter:saturate(180%) blur(20px);
+  border-top:0.5px solid rgba(255,255,255,0.08);
 }
 .k{
   flex:1;min-width:0;
   display:flex;align-items:center;justify-content:center;
-  background:#181a1c;border:none;border-radius:4px;
-  font-size:11px;font-weight:700;
-  font-family:'Courier New',monospace;
-  color:#999;
+  background:rgba(255,255,255,0.065);border:none;border-radius:11px;
+  font-size:12.5px;font-weight:600;
+  font-family:-apple-system,system-ui,sans-serif;
+  color:#dfe3e8;
   touch-action:manipulation;cursor:pointer;
   -webkit-user-select:none;user-select:none;
   -webkit-tap-highlight-color:transparent;
+  transition:background .12s ease,transform .12s ease;
 }
-.k.mod{color:#7ab4ff;background:#15192a;}
-.k.mod.on{background:#222f55;color:#b8d4ff;box-shadow:0 0 0 1px #3355bb inset;}
-.k.flash{background:#2e3338;color:#fff;}
+.k:active{transform:scale(0.94);}
+.k.mod{color:#9ecbff;background:rgba(94,158,255,0.10);}
+.k.mod.on{background:rgba(94,158,255,0.28);color:#e8f2ff;box-shadow:0 0 0 1px rgba(94,158,255,0.45) inset;}
+.k.flash{background:rgba(255,255,255,0.18);color:#fff;}
+#ksend{flex:1.35;background:#32d74b;color:#06280f;font-weight:800;font-size:12px;letter-spacing:.4px;}
+#ksend:active,#ksend.flash{background:#45e357;transform:scale(0.96);}
 
-/* ─── Side menu ─── */
-#mmask{display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:80;}
+/* ─── Toast ─── */
+#toast{
+  position:fixed;left:50%;
+  bottom:calc(72px + env(safe-area-inset-bottom,0px));
+  transform:translateX(-50%) translateY(8px);
+  background:rgba(28,30,34,0.92);
+  -webkit-backdrop-filter:blur(16px);backdrop-filter:blur(16px);
+  border:0.5px solid rgba(255,255,255,0.12);
+  color:#e8eaee;font-size:13px;font-weight:600;
+  padding:9px 18px;border-radius:999px;
+  opacity:0;pointer-events:none;z-index:120;
+  transition:opacity .22s ease,transform .22s ease;
+}
+#toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
+
+/* ─── Side menu — iOS grouped lists ─── */
+#mmask{display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:80;}
 #mmask.open{display:block;}
 #menu{
-  position:fixed;top:0;right:0;bottom:0;width:256px;
-  background:#0a0b0c;border-left:1px solid #1a1a1a;
+  position:fixed;top:0;right:0;bottom:0;width:280px;
+  background:#0d0e10;
+  border-left:0.5px solid rgba(255,255,255,0.08);
   z-index:81;transform:translateX(110%);
-  transition:transform .2s ease;
+  transition:transform .26s cubic-bezier(.32,.72,.35,1);
   display:flex;flex-direction:column;
   overflow-y:auto;
   padding-top:env(safe-area-inset-top,0px);
@@ -169,86 +229,87 @@ html,body{
 #menu.open{transform:translateX(0);}
 #mhead{
   display:flex;align-items:center;justify-content:space-between;
-  padding:14px 16px;border-bottom:1px solid #161616;flex-shrink:0;
+  padding:18px 18px 8px;flex-shrink:0;
 }
 #mhead span:first-child{
-  font-size:9px;letter-spacing:2.5px;text-transform:uppercase;
-  color:#333;font-family:'Courier New',monospace;
+  font-size:20px;font-weight:700;color:#f2f3f5;letter-spacing:-.3px;
 }
 #mclose{
-  color:#333;font-size:18px;cursor:pointer;padding:2px 6px;
+  color:#7c828b;font-size:18px;cursor:pointer;padding:2px 8px;
   touch-action:manipulation;-webkit-user-select:none;user-select:none;
 }
+.mgroup{margin:8px 14px;border-radius:14px;background:rgba(255,255,255,0.045);overflow:hidden;}
+.mgroup .mrow:last-child,.mgroup .themes{border-bottom:none;}
 .msec{
-  padding:10px 14px 3px;font-size:9px;letter-spacing:2px;
-  text-transform:uppercase;color:#242424;font-family:'Courier New',monospace;
+  padding:12px 16px 6px;font-size:11px;font-weight:600;letter-spacing:1.2px;
+  text-transform:uppercase;color:#62666d;
 }
 .mrow{
-  display:flex;align-items:center;gap:10px;
-  padding:13px 16px;border-bottom:1px solid #111;
+  display:flex;align-items:center;gap:12px;
+  padding:13px 16px;border-bottom:0.5px solid rgba(255,255,255,0.06);
   cursor:pointer;touch-action:manipulation;
   -webkit-user-select:none;user-select:none;
 }
-.mrow:active{background:#111;}
-.mi{font-size:15px;width:22px;text-align:center;flex-shrink:0;}
-.ml{flex:1;font-size:13px;color:#777;font-family:'Courier New',monospace;}
-.fsrow{display:flex;align-items:center;gap:8px;}
+.mrow:active{background:rgba(255,255,255,0.05);}
+.mi{font-size:15px;width:24px;text-align:center;flex-shrink:0;color:#8e939b;}
+.ml{flex:1;font-size:15px;color:#e8eaee;font-weight:500;letter-spacing:-.2px;}
+.fsrow{display:flex;align-items:center;gap:10px;}
 .fsbtn{
   width:32px;height:32px;display:flex;align-items:center;justify-content:center;
-  background:#181818;border:1px solid #222;border-radius:4px;
-  font-size:18px;color:#666;cursor:pointer;
+  background:rgba(255,255,255,0.08);border:none;border-radius:9px;
+  font-size:17px;font-weight:600;color:#dfe3e8;cursor:pointer;
   touch-action:manipulation;-webkit-user-select:none;user-select:none;
 }
 #fsval{
-  width:26px;text-align:center;font-size:13px;font-weight:700;
-  color:#ccc;font-family:'Courier New',monospace;
+  width:28px;text-align:center;font-size:14px;font-weight:700;
+  color:#fff;font-family:ui-monospace,Menlo,monospace;
 }
-.themes{display:flex;gap:6px;flex-wrap:wrap;padding:8px 16px 14px;}
+.themes{display:flex;gap:8px;flex-wrap:wrap;padding:10px 16px 14px;}
 .topt{
-  padding:5px 12px;background:#111;border:1px solid #1e1e1e;border-radius:14px;
-  font-size:10px;font-weight:700;color:#444;cursor:pointer;
-  font-family:'Courier New',monospace;touch-action:manipulation;
-  -webkit-user-select:none;user-select:none;
-}
-.topt.on{background:#071507;border-color:#225222;color:#55ff55;}
-/* ─── Paste sheet ─── */
-#pmask{display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:90;}
-#pmask.open{display:block;}
-#psheet{
-  position:fixed;left:0;right:0;bottom:0;z-index:91;
-  background:#0a0b0c;border-top:1px solid #1a1a1a;
-  border-radius:10px 10px 0 0;
-  transform:translateY(110%);
-  transition:transform .2s ease;
-  padding:10px 14px max(12px, env(safe-area-inset-bottom, 12px));
-}
-#psheet.open{transform:translateY(0);}
-#phead{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;}
-#phead span:first-child{font-size:9px;letter-spacing:2px;text-transform:uppercase;color:#333;font-family:'Courier New',monospace;}
-#pclose{color:#333;font-size:18px;cursor:pointer;padding:2px 6px;touch-action:manipulation;-webkit-user-select:none;user-select:none;}
-#ptxt{
-  width:100%;min-height:88px;resize:none;
-  background:#000;border:1px solid #1a1a1a;border-radius:5px;
-  color:#bbb;font-family:'Courier New',monospace;font-size:16px;
-  padding:8px;outline:none;-webkit-appearance:none;
-}
-#psend{
-  margin-top:8px;width:100%;padding:10px;
-  background:#071507;border:1px solid #225222;border-radius:5px;
-  color:#55ff55;font-size:12px;font-weight:700;letter-spacing:1px;
-  font-family:'Courier New',monospace;cursor:pointer;
+  padding:7px 14px;background:rgba(255,255,255,0.06);
+  border:0.5px solid rgba(255,255,255,0.10);border-radius:999px;
+  font-size:12.5px;font-weight:600;color:#9aa0a8;cursor:pointer;
   touch-action:manipulation;-webkit-user-select:none;user-select:none;
 }
-#psend:active{background:#0a2a0a;}
+.topt.on{background:rgba(50,215,75,0.12);border-color:rgba(50,215,75,0.5);color:#5ce65e;}
 #notifbtn{
-  margin:8px 14px;padding:9px 12px;
-  background:#091009;border:1px solid #1a2e1a;border-radius:5px;
-  text-align:center;font-size:11px;color:#448844;
-  font-family:'Courier New',monospace;cursor:pointer;
-  touch-action:manipulation;-webkit-user-select:none;user-select:none;
+  margin:10px 18px 2px;padding:11px 14px;
+  background:rgba(94,158,255,0.10);border:0.5px solid rgba(94,158,255,0.35);
+  border-radius:12px;text-align:center;font-size:13px;font-weight:600;color:#9ecbff;
+  cursor:pointer;touch-action:manipulation;-webkit-user-select:none;user-select:none;
   display:none;
 }
 #notifbtn.show{display:block;}
+
+/* ─── Paste sheet — iOS style ─── */
+#pmask{display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:90;}
+#pmask.open{display:block;}
+#psheet{
+  position:fixed;left:0;right:0;bottom:0;z-index:91;
+  background:#141518;
+  border-top:0.5px solid rgba(255,255,255,0.12);
+  border-radius:16px 16px 0 0;
+  transform:translateY(110%);
+  transition:transform .28s cubic-bezier(.32,.72,.35,1);
+  padding:14px 16px max(14px, env(safe-area-inset-bottom, 14px));
+}
+#psheet.open{transform:translateY(0);}
+#phead{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;}
+#phead span:first-child{font-size:17px;font-weight:700;color:#f2f3f5;}
+#pclose{color:#7c828b;font-size:18px;cursor:pointer;padding:2px 8px;touch-action:manipulation;-webkit-user-select:none;user-select:none;}
+#ptxt{
+  width:100%;min-height:96px;resize:none;
+  background:#0a0b0d;border:0.5px solid rgba(255,255,255,0.10);border-radius:12px;
+  color:#e8eaee;font-family:ui-monospace,'SF Mono',Menlo,monospace;font-size:16px;
+  padding:10px;outline:none;-webkit-appearance:none;
+}
+#psend{
+  margin-top:10px;width:100%;padding:13px;
+  background:#32d74b;border:none;border-radius:13px;
+  color:#06280f;font-size:14px;font-weight:800;letter-spacing:.3px;
+  cursor:pointer;touch-action:manipulation;-webkit-user-select:none;user-select:none;
+}
+#psend:active{background:#45e357;}
 </style>
 </head>
 <body>
@@ -270,51 +331,104 @@ html,body{
       inputmode="text" enterkeyhint="send"
       tabindex="0" aria-hidden="true"></textarea>
     <div id="gobot">&#x25BC;</div>
+    <div id="rail">&#x2328;</div>
     <div id="badge"></div>
   </div>
 
-  <!-- Key bar — always above keyboard -->
+  <!-- Expandable key rows (tap the ⌨ side button) -->
+  <div id="xkeys">
+    <div class="xkrow">
+      <div class="xk" data-v="~">~</div>
+      <div class="xk" data-v="/">/</div>
+      <div class="xk" data-v=".">.</div>
+      <div class="xk" data-v=":">:</div>
+      <div class="xk" data-v=";">;</div>
+      <div class="xk" data-v="|">|</div>
+      <div class="xk" data-v="-">-</div>
+      <div class="xk" data-v="!">!</div>
+      <div class="xk" data-v="?">?</div>
+      <div class="xk" data-v="&amp;">&amp;</div>
+      <div class="xk" data-v="@">@</div>
+      <div class="xk" data-v="#">#</div>
+    </div>
+    <div class="xkrow">
+      <div class="xk" data-v="{">{</div>
+      <div class="xk" data-v="}">}</div>
+      <div class="xk" data-v="(">(</div>
+      <div class="xk" data-v=")">)</div>
+      <div class="xk" data-v="[">[</div>
+      <div class="xk" data-v="]">]</div>
+      <div class="xk" data-v="&lt;">&lt;</div>
+      <div class="xk" data-v="&gt;">&gt;</div>
+      <div class="xk" data-v="$">$</div>
+      <div class="xk" data-v="&#34;">&#34;</div>
+      <div class="xk" data-v="&#39;">&#39;</div>
+      <div class="xk" data-v="`">`</div>
+    </div>
+    <div class="xkrow">
+      <div class="xk tool" data-k="cc">^C</div>
+      <div class="xk tool" data-k="cx">^X</div>
+      <div class="xk tool" data-k="cz">^Z</div>
+      <div class="xk tool" data-k="cd">^D</div>
+      <div class="xk tool" data-k="cl">^L</div>
+      <div class="xk tool" data-k="cu">^U</div>
+      <div class="xk tool" data-k="home">HOME</div>
+      <div class="xk tool" data-k="end">END</div>
+      <div class="xk tool" data-k="pgup">PGUP</div>
+      <div class="xk tool" data-k="pgdn">PGDN</div>
+    </div>
+  </div>
+
+  <!-- Key bar -->
   <div id="keybar">
     <div class="k mod" id="kctrl">CTL</div>
     <div class="k mod" id="kalt">ALT</div>
     <div class="k"     id="kesc">ESC</div>
     <div class="k"     id="ktab">TAB</div>
-    <div class="k"     id="kup">&#x25B2;</div>
-    <div class="k"     id="kdown">&#x25BC;</div>
     <div class="k"     id="kleft">&#x25C4;</div>
+    <div class="k"     id="kdown">&#x25BC;</div>
+    <div class="k"     id="kup">&#x25B2;</div>
     <div class="k"     id="kright">&#x25BA;</div>
     <div class="k"     id="kpaste">&#9112;</div>
-    <div class="k"     id="kpipe">|</div>
-    <div class="k"     id="kdash">-</div>
+    <div class="k"     id="ksend">&#8629;&#160;SEND</div>
   </div>
 </div>
+
+<!-- Toast -->
+<div id="toast"></div>
 
 <!-- Side menu -->
 <div id="mmask"></div>
 <div id="menu">
   <div id="mhead">
-    <span>Kali Terminal</span>
+    <span>Kali</span>
     <span id="mclose">&#x2715;</span>
   </div>
   <div id="notifbtn">&#x1F514; Enable notifications</div>
-  <div class="msec">Display</div>
-  <div class="mrow" style="cursor:default">
-    <span class="mi">A</span>
-    <span class="ml">Font Size</span>
-    <div class="fsrow">
-      <div class="fsbtn" id="fsm">&#8722;</div>
-      <div id="fsval">14</div>
-      <div class="fsbtn" id="fsp">+</div>
+  <div class="mgroup">
+    <div class="msec">Display</div>
+    <div class="mrow" style="cursor:default">
+      <span class="mi">A</span>
+      <span class="ml">Font Size</span>
+      <div class="fsrow">
+        <div class="fsbtn" id="fsm">&#8722;</div>
+        <div id="fsval">14</div>
+        <div class="fsbtn" id="fsp">+</div>
+      </div>
+    </div>
+    <div class="themes">
+      <div class="topt" data-t="kali">Kali</div>
+      <div class="topt" data-t="matrix">Matrix</div>
+      <div class="topt" data-t="dracula">Dracula</div>
     </div>
   </div>
-  <div class="themes">
-    <div class="topt" data-t="kali">Kali</div>
-    <div class="topt" data-t="matrix">Matrix</div>
-    <div class="topt" data-t="dracula">Dracula</div>
+  <div class="mgroup">
+    <div class="msec">Session</div>
+    <div class="mrow" id="mnew"><span class="mi">+</span><span class="ml">New Terminal</span></div>
+    <div class="mrow" id="mpaste"><span class="mi">&#9112;</span><span class="ml">Paste from Clipboard</span></div>
+    <div class="mrow" id="mcopy"><span class="mi">&#x2398;</span><span class="ml">Copy Selection</span></div>
+    <div class="mrow" id="mclear"><span class="mi">&#x239A;</span><span class="ml">Clear Screen</span></div>
   </div>
-  <div class="msec">Session</div>
-  <div class="mrow" id="mnew"><span class="mi">+</span><span class="ml">New Terminal</span></div>
-  <div class="mrow" id="mclear"><span class="mi">&#x239A;</span><span class="ml">Clear Screen</span></div>
 </div>
 
 <!-- Paste sheet -->
@@ -391,7 +505,7 @@ var FitCls = (_FA && _FA.FitAddon) ? _FA.FitAddon : _FA;
 var term = new Terminal({
   cursorBlink:true, cursorStyle:'block',
   fontSize:fontSize,
-  fontFamily:'"Courier New",Courier,monospace',
+  fontFamily:'ui-monospace,SFMono-Regular,Menlo,"Courier New",monospace',
   lineHeight:1.2, scrollback:50000,
   allowTransparency:true,
   theme:THEMES[curTheme] || THEMES.kali,
@@ -425,7 +539,6 @@ function resizeToVV() {
 }
 if (window.visualViewport) {
   window.visualViewport.addEventListener('resize', resizeToVV);
-  window.visualViewport.addEventListener('scroll', resizeToVV);
 }
 window.addEventListener('resize', resizeToVV);
 resizeToVV();
@@ -543,15 +656,26 @@ kb.addEventListener('paste', function(e){
 });
 
 /* Touch on terminal: scroll + left-swipe to open menu */
-var _tx0=0,_ty0=0,_ty1=0,_swp=false;
+var _tx0=0,_ty0=0,_ty1=0,_swp=false,_vel=0;
 kb.addEventListener('touchstart',function(e){
   _tx0=e.touches[0].clientX; _ty0=_ty1=e.touches[0].clientY; _swp=false;
 },{passive:true});
 kb.addEventListener('touchmove',function(e){
   var x=e.touches[0].clientX, y=e.touches[0].clientY;
   var dy=_ty1-y; _ty1=y;
+  _vel = dy;
   if(Math.abs(dy)>0.5) term.scrollLines(Math.round(dy/(fontSize*1.2)));
   if(!_swp && _tx0<32 && x-_tx0>55 && Math.abs(y-_ty0)<70){ _swp=true; openMenu(); }
+},{passive:true});
+kb.addEventListener('touchend',function(){
+  var v=_vel; _vel=0;
+  var lh=fontSize*1.2;
+  (function mom(){
+    if(Math.abs(v)<0.6) return;
+    try{ term.scrollLines(Math.round(v/lh)); }catch(_){ return; }
+    v*=0.92;
+    requestAnimationFrame(mom);
+  })();
 },{passive:true});
 
 /* ─── quickTap: reliable tap on any element (touch + mouse) ─── */
@@ -787,8 +911,8 @@ function closePasteSheet(){
 function tryClipboardRead(){
   if (navigator.clipboard && navigator.clipboard.readText) {
     navigator.clipboard.readText().then(function(t){
-      if (t) sendPaste(t); else openPasteSheet();
-    }).catch(function(){ openPasteSheet(); });
+      if (t) sendPaste(t); else toast('Clipboard is empty');
+    }).catch(function(){ toast('Paste blocked \u2014 use menu \u2192 Paste'); });
   } else { openPasteSheet(); }
 }
 quickTap(document.getElementById('pclose'), function(){ closePasteSheet(); kbFocus(); });
@@ -800,6 +924,58 @@ quickTap(document.getElementById('psend'), function(){
   sendPaste(t);
 });
 keyBtn('kpaste', function(){ tryClipboardRead(); });
+keyBtn('ksend',  function(){ pushHist(pendLine); send('\r'); kbFocus(); });
+
+/* ─── Toast ─── */
+var toastEl = document.getElementById('toast'), toastT = null;
+function toast(msg){
+  toastEl.textContent = msg;
+  toastEl.classList.add('show');
+  clearTimeout(toastT);
+  toastT = setTimeout(function(){ toastEl.classList.remove('show'); }, 1700);
+}
+
+/* ─── Side rail: expandable keyboard bars ─── */
+var rail = document.getElementById('rail');
+var xkeys = document.getElementById('xkeys');
+quickTap(rail, function(){
+  var on = xkeys.classList.toggle('open');
+  rail.classList.toggle('on', on);
+  rail.innerHTML = on ? '&#10005;' : '&#8992;';
+});
+
+/* ─── Expandable row keys ─── */
+var XSEQ = {
+  cc:'\x03', cx:'\x18', cz:'\x1a', cd:'\x04', cl:'\x0c', cu:'\x15',
+  home:'\x1b[H', end:'\x1b[F', pgup:'\x1b[5~', pgdn:'\x1b[6~'
+};
+function wireXk(el){
+  function fire(e){
+    if(e.cancelable) e.preventDefault();
+    el.classList.add('flash');
+    setTimeout(function(){ el.classList.remove('flash'); }, 110);
+    var t = el.dataset.k;
+    if (t && XSEQ[t]) send(XSEQ[t]);
+    else if (el.dataset.v) send(el.dataset.v);
+    kbFocus();
+  }
+  el.addEventListener('touchstart', fire, {passive:false});
+  el.addEventListener('mousedown', fire, false);
+}
+document.querySelectorAll('.xk').forEach(wireXk);
+
+/* ─── Menu: paste + copy actions ─── */
+quickTap(document.getElementById('mpaste'), function(){ closeMenu(); openPasteSheet(); });
+quickTap(document.getElementById('mcopy'), function(){
+  var sel='';
+  try{ sel = term.getSelection(); }catch(_){}
+  if(sel){
+    var p = (navigator.clipboard && navigator.clipboard.writeText)
+      ? navigator.clipboard.writeText(sel) : Promise.reject();
+    p.then(function(){ toast('Copied'); }).catch(function(){ toast('Copy failed'); });
+  } else { toast('Nothing selected'); }
+  kbFocus();
+});
 
 /* ─── Keybar buttons (fire on touchstart for zero delay) ─── */
 keyBtn('kctrl', function(){ setCtrl(!ctrlOn); kbFocus(); });
@@ -810,8 +986,7 @@ keyBtn('kup',   function(){ send('\x1b[A');    kbFocus(); });
 keyBtn('kdown', function(){ send('\x1b[B');    kbFocus(); });
 keyBtn('kleft', function(){ send('\x1b[D');    kbFocus(); });
 keyBtn('kright',function(){ send('\x1b[C');    kbFocus(); });
-keyBtn('kpipe', function(){ send('|');         kbFocus(); });
-keyBtn('kdash', function(){ send('-');         kbFocus(); });
+/* | and - moved into the expandable keyboard rows */
 
 /* ─── Boot ─── */
 if(saved.length){
