@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8"/>
-<meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no,viewport-fit=cover"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no,viewport-fit=cover,interactive-widget=resizes-content"/>
 <meta name="mobile-web-app-capable" content="yes"/>
 <meta name="apple-mobile-web-app-capable" content="yes"/>
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
@@ -21,6 +21,8 @@
 html,body{
   width:100%;height:100%;
   background:#000;overflow:hidden;
+  overscroll-behavior:none;
+  touch-action:manipulation;
   -webkit-text-size-adjust:100%;
   -webkit-tap-highlight-color:transparent;
   font-family:-apple-system,BlinkMacSystemFont,'SF Pro Text',system-ui,sans-serif;
@@ -32,36 +34,37 @@ html,body{
   top:0;left:0;right:0;
   display:flex;flex-direction:column;
   background:#000;
+  padding-top:env(safe-area-inset-top,0px);
 }
 
-/* ─── Tab bar — translucent blur, floating pills ─── */
-#tabbar{
-  display:flex;align-items:stretch;
-  flex-shrink:0;
-  min-height:52px;
-  padding-top:env(safe-area-inset-top,0px);
-  background:rgba(14,16,19,0.85);
-  -webkit-backdrop-filter:saturate(180%) blur(20px);
-  backdrop-filter:saturate(180%) blur(20px);
-  border-bottom:0.5px solid rgba(255,255,255,0.08);
-}
+/* ─── Floating menu button (Termux: nothing on top but the terminal) ─── */
 #menubtn{
-  flex-shrink:0;width:46px;
+  position:fixed;
+  top:calc(10px + env(safe-area-inset-top,0px));
+  left:10px;
+  width:38px;height:38px;
   display:flex;align-items:center;justify-content:center;
-  color:#8e939b;font-size:20px;
+  color:#a9aeb6;font-size:19px;
+  background:rgba(20,22,26,0.72);
+  -webkit-backdrop-filter:saturate(180%) blur(18px);
+  backdrop-filter:saturate(180%) blur(18px);
+  border:0.5px solid rgba(255,255,255,0.10);
+  border-radius:12px;
+  z-index:60;
   cursor:pointer;touch-action:manipulation;
   -webkit-user-select:none;user-select:none;
 }
-#tabs{
-  flex:1;display:flex;align-items:center;gap:7px;
-  overflow-x:auto;overflow-y:hidden;
+#menubtn:active{background:rgba(50,215,75,0.18);}
+/* ─── Sessions (sidebar rows) ─── */
+#stabs{
+  max-height:26vh;overflow-y:auto;
   -webkit-overflow-scrolling:touch;
-  scrollbar-width:none;padding:0 8px;
+  scrollbar-width:none;
 }
-#tabs::-webkit-scrollbar{display:none;}
+#stabs::-webkit-scrollbar{display:none;}
 .tab{
-  flex-shrink:0;display:flex;align-items:center;gap:6px;
-  padding:7px 13px;border-radius:999px;
+  flex-shrink:0;display:flex;align-items:center;gap:8px;
+  margin:5px 12px;padding:11px 14px;border-radius:11px;
   background:rgba(255,255,255,0.055);
   border:0.5px solid transparent;
   cursor:pointer;touch-action:manipulation;
@@ -73,21 +76,14 @@ html,body{
 .tab.live .tdot{background:#32d74b;box-shadow:0 0 6px rgba(50,215,75,0.8);}
 .tab.dead .tdot{background:#ff453a;}
 .tname{
-  font-size:12.5px;font-weight:600;color:#9aa0a8;letter-spacing:.2px;
-  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:86px;
+  flex:1;
+  font-size:13px;font-weight:600;color:#9aa0a8;letter-spacing:.2px;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
 }
 .tab.cur .tname{color:#5ce65e;}
 .tab.unread .tname::before{content:'\25CF ';color:#ffd60a;font-size:8px;}
 .tx{font-size:13px;color:#5c626b;padding-left:2px;flex-shrink:0;}
 .tab.cur .tx{color:#7d828a;}
-#addtab{
-  flex-shrink:0;width:44px;
-  display:flex;align-items:center;justify-content:center;
-  color:#8e939b;font-size:22px;font-weight:300;
-  cursor:pointer;touch-action:manipulation;
-  -webkit-user-select:none;user-select:none;
-}
-
 /* ─── Terminal ─── */
 #term-area{
   flex:1;position:relative;overflow:hidden;background:#000;min-height:0;
@@ -338,12 +334,8 @@ html,body{
 <body>
 <div id="app">
 
-  <!-- Tab bar -->
-  <div id="tabbar">
-    <div id="menubtn">&#9776;</div>
-    <div id="tabs"></div>
-    <div id="addtab">+</div>
-  </div>
+  <!-- Floating menu button -->
+  <div id="menubtn">&#9776;</div>
 
   <!-- Terminal area -->
   <div id="term-area">
@@ -429,6 +421,11 @@ html,body{
   </div>
   <div id="notifbtn">&#x1F514; Enable notifications</div>
   <div class="mgroup">
+    <div class="msec">Sessions</div>
+    <div id="stabs"></div>
+    <div class="mrow" id="mnew"><span class="mi">+</span><span class="ml">New Terminal</span></div>
+  </div>
+  <div class="mgroup">
     <div class="msec">Command History</div>
     <div id="hlist"></div>
     <div class="mrow" id="mhistclear"><span class="mi">&#128465;</span><span class="ml">Clear History</span></div>
@@ -452,7 +449,6 @@ html,body{
   </div>
   <div class="mgroup">
     <div class="msec">Session</div>
-    <div class="mrow" id="mnew"><span class="mi">+</span><span class="ml">New Terminal</span></div>
     <div class="mrow" id="mpaste"><span class="mi">&#9112;</span><span class="ml">Paste from Clipboard</span></div>
     <div class="mrow" id="mcopy"><span class="mi">&#x2398;</span><span class="ml">Copy Selection</span></div>
     <div class="mrow" id="mclear"><span class="mi">&#x239A;</span><span class="ml">Clear Screen</span></div>
@@ -823,7 +819,7 @@ function killSession(id){
 
 /* ─── Tab bar ─── */
 function renderTabs(){
-  var c=document.getElementById('tabs');
+  var c=document.getElementById('stabs');
   c.innerHTML='';
   sessions.forEach(function(s){
     var sid=s.id;
@@ -841,9 +837,6 @@ function renderTabs(){
       if(sid!==activeId) switchTo(sid);
     });
     c.appendChild(el);
-    if(sid===activeId) setTimeout(function(){
-      try{el.scrollIntoView({inline:'nearest',behavior:'smooth'});}catch(_){}
-    },40);
   });
 }
 
@@ -852,6 +845,7 @@ function openMenu(){
   document.getElementById('menu').classList.add('open');
   document.getElementById('mmask').classList.add('open');
   try{ renderHist(); }catch(_){}
+  try{ renderTabs(); }catch(_){}
 }
 function closeMenu(){
   document.getElementById('menu').classList.remove('open');
@@ -859,7 +853,6 @@ function closeMenu(){
 }
 
 quickTap(document.getElementById('menubtn'), openMenu);
-quickTap(document.getElementById('addtab'), function(){ newSession(); });
 quickTap(document.getElementById('mmask'),  closeMenu);
 quickTap(document.getElementById('mclose'), closeMenu);
 quickTap(document.getElementById('mnew'),  function(){ newSession(); closeMenu(); });
