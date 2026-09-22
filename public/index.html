@@ -55,6 +55,7 @@ html,body{
   -webkit-user-select:none;user-select:none;
 }
 #menubtn:active{background:rgba(50,215,75,0.18);}
+#menubtn{box-shadow:0 4px 18px rgba(0,0,0,0.45);}
 /* ─── Sessions (sidebar rows) ─── */
 #stabs{
   max-height:26vh;overflow-y:auto;
@@ -95,7 +96,12 @@ html,body{
 }
 #tinner{position:absolute;inset:0;padding:4px;z-index:1;}
 .xterm,.xterm-viewport,.xterm-screen{height:100%!important;}
-.xterm-viewport{background:transparent!important;overflow-y:hidden!important;}
+.xterm-viewport{
+  background:transparent!important;
+  overflow-y:auto!important;
+  -webkit-overflow-scrolling:touch;
+  overscroll-behavior:contain;
+}
 
 /* Transparent textarea — captures mobile keyboard input */
 #kb{
@@ -245,7 +251,7 @@ html,body{
   padding-top:env(safe-area-inset-top,0px);
   padding-bottom:env(safe-area-inset-bottom,0px);
 }
-#menu.open{transform:translateX(0);}
+#menu.open{transform:translateX(0);box-shadow:26px 0 70px rgba(0,0,0,0.55);}
 #mhead{
   display:flex;align-items:center;justify-content:space-between;
   padding:18px 18px 8px;flex-shrink:0;
@@ -751,7 +757,7 @@ function saveTokens(){
 function newSession(existToken, existName){
   sn++;
   var id   = 'S'+sn;
-  var name = existName || ('bash '+sn);
+  var name = existName || ('#'+sn);
   var sock = io({
     transports:['websocket','polling'],
     reconnection:true, reconnectionAttempts:Infinity,
@@ -775,6 +781,14 @@ function newSession(existToken, existName){
     } else {
       s.unread=true; renderTabs(); bgNotify(s.name,d);
     }
+  });
+
+  sock.on('snotice', function(d){
+    s.buf += d;
+    if(s.buf.length>131072) s.buf=s.buf.slice(-65536);
+    if(activeId===id) term.write(d);
+    else { s.unread=true; renderTabs(); }
+    bgNotify('Share', String(d).replace(/\x1b\[[0-9;]*m/g,'').replace(/\r|\n/g,' ').trim());
   });
 
   sock.on('connect', function(){

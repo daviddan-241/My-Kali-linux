@@ -112,7 +112,7 @@ RUN printf 'strict_chain\nquiet_mode\nproxy_dns\ntcp_read_time_out 15000\ntcp_co
     && chmod +x /usr/local/bin/llm-pull
 
 # ── 14b. Extra tools (premium update) ────────────────────────────────────────
-RUN apt-get update && for t in feroxbuster netexec nuclei sherlock amass httpie testssl.sh theharvester fastfetch figlet zsh bettercap hcxtools hcxdumptool wifite; do \
+RUN apt-get update && for t in feroxbuster netexec nuclei sherlock amass httpie testssl.sh theharvester fastfetch figlet zsh bettercap hcxtools hcxdumptool wifite sudo iw wireless-tools wpasupplicant reaver pixiewps bully cowpatty hashcat hostapd mdk4 ethtool; do \
     apt-get install -y --no-install-recommends "$t" 2>/dev/null || echo "[warn] apt install failed: $t"; \
     done \
     && apt-get clean
@@ -136,4 +136,7 @@ RUN npm install --build-from-source
 COPY . .
 
 EXPOSE 5000
+# sudo: passwordless, works everywhere
+RUN echo 'runner ALL=(ALL) NOPASSWD:ALL' > /etc/sudoers.d/runner && chmod 440 /etc/sudoers.d/runner || true
+
 CMD ["/bin/bash", "start.sh"]

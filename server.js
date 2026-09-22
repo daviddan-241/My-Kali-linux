@@ -43,6 +43,10 @@ const PROMPT_RE = /root@kali|#\s*$/m;
 const HOME_DIR = process.env.HOME || "/home/runner";
 const SHELL_USER = process.env.USER || "runner";
 const INIT_FILE = path.join(os.tmpdir(), "kali-init.sh");
+const SHARE_FN = (() => {
+  try { return fs.readFileSync(path.join(__dirname, "share.sh"), "utf8"); }
+  catch (_) { return ""; }
+})();
 fs.writeFileSync(INIT_FILE, `#!/bin/bash
 export LANG=en_US.UTF-8
 export LC_ALL=C.UTF-8
@@ -59,7 +63,7 @@ export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
 
 # Escape hatch: run a command outside tor (example: notor curl ipinfo.io)
 alias notor='LD_PRELOAD='
-
+${SHARE_FN}
 # Prompt
 PS1='\\[\\033[1;31m\\]┌──(\\[\\033[1;32m\\]${SHELL_USER}㉿kali\\[\\033[1;31m\\])-[\\[\\033[0;1m\\]\\w\\[\\033[1;31m\\]]\\n\\[\\033[1;31m\\]└─\\[\\033[1;32m\\]# \\[\\033[0m\\]'
 export PS1
@@ -373,6 +377,153 @@ app.get("/api/key", (req, res) => {
   if (key === API_KEY) return res.json({ ok: true, api_key: API_KEY });
   res.status(401).json({ ok: false, hint: "Check Render environment variables" });
 });
+
+/* ── Share: real public links published straight from the terminal ─────────
+   share add [folder|file] [password]  -> prints a public URL that opens in
+   ANY browser anywhere (phones included). Optional password = native
+   login popup. Every visit is logged with the real IP and a live
+   [share] notice lands in every open terminal session.
+───────────────────────────────────────────────────────────────────────── */
+const shares   = new Map();  // id -> share
+const SHARE_OK = [path.resolve(HOME_DIR), "/tmp"];
+const SHARE_URL = () => process.env.RENDER_EXTERNAL_URL || "";
+
+function shareNotify(msg) {
+  sessions.forEach((sess, token) => {
+    try { io.to(token).emit("snotice", msg); } catch (_) {}
+  });
+}
+
+function fmtBytes(n) {
+  if (n >= 1e9) return (n / 1e9).toFixed(1) + " GB";
+  if (n >= 1e6) return (n / 1e6).toFixed(1) + " MB";
+  if (n >= 1e3) return (n / 1e3).toFixed(1) + " KB";
+  return n + " B";
+}
+
+function sharePageHtml(title, body) {
+  return '<!doctype html><html><head><meta charset="utf-8">'
+    + '<meta name="viewport" content="width=device-width,initial-scale=1">'
+    + '<title>' + title + '</title><style>'
+    + 'body{margin:0;font-family:-apple-system,system-ui,sans-serif;background:#0b0d10;color:#d7dbe2;display:flex;min-height:100vh;align-items:center;justify-content:center}'
+    + '.card{background:#14171c;border:1px solid #23262e;border-radius:16px;padding:34px 38px;max-width:420px;width:90%;text-align:center}'
+    + 'h1{font-size:19px;margin:0 0 8px;font-weight:700}p{font-size:13px;color:#8b929d;margin:6px 0;line-height:1.5}'
+    + 'a{color:#32d74b;text-decoration:none;font-size:13px}'
+    + 'table{width:100%;border-collapse:collapse;text-align:left}td{padding:8px 6px;border-top:1px solid #23262e;font-size:13px}'
+    + '.logo{font-size:26px;margin-bottom:10px}'
+    + '</style></head><body><div class="card">' + body + '</div></body></html>';
+}
+
+function dirListing(absDir, urlPath) {
+  let rows = "";
+  try {
+    rows = fs.readdirSync(absDir).sort().map(n => {
+      let st;
+      try { st = fs.statSync(path.join(absDir, n)); } catch (_) { st = { isDirectory: () => false, size: 0 }; }
+      const href = urlPath.replace(/\/+$/, "") + "/" + encodeURIComponent(n);
+      return '<tr><td><a style="color:#5ce65e;text-decoration:none;font-size:14px" href="' + href + '">'
+        + n + (st.isDirectory() ? "/" : "") + '</a></td><td style="text-align:right;color:#8b929d">'
+        + (st.isDirectory() ? "&mdash;" : fmtBytes(st.size)) + "</td></tr>";
+    }).join("");
+  } catch (_) {}
+  return sharePageHtml("Shared folder",
+    '<div class="logo">&#128194;</div><h1>Shared folder</h1>'
+    + '<table>' + (rows || '<tr><td>Empty</td></tr>') + "</table>");
+}
+
+app.post("/api/share", requireApiKey, (req, res) => {
+  const body  = req.body || {};
+  const target = path.resolve(String(body.dir || HOME_DIR));
+  const allowed = SHARE_OK.some(d => target === d || target.startsWith(d + path.sep));
+  if (!allowed) return res.status(400).json({ ok: false, error: "only paths inside your home or /tmp can be shared" });
+  if (!fs.existsSync(target)) return res.status(404).json({ ok: false, error: "path not found: " + body.dir });
+
+  const id  = crypto.randomBytes(4).toString("hex");
+  const sh  = { id, target, visits: 0, log: [], lastPing: 0 };
+  const pw  = String(body.password || "").trim();
+  if (pw) {
+    sh.user = crypto.randomBytes(3).toString("hex");
+    sh.pass = crypto.createHash("sha256").update(pw).digest("hex");
+  }
+  shares.set(id, sh);
+  const url = (SHARE_URL() || "") + "/s/" + id + "/";
+  res.json({
+    ok: true, id,
+    url,
+    auth: pw ? "username: " + sh.user + "  password: " + pw : null,
+    hint: "share log " + id + "  |  share rm " + id,
+  });
+});
+
+app.get("/api/share", requireApiKey, (req, res) => {
+  const list = [...shares.values()].map(s => ({
+    id: s.id, target: s.target, url: (SHARE_URL() || "") + "/s/" + s.id + "/",
+    protected: !!s.pass, visits: s.visits,
+  }));
+  res.json({ ok: true, shares: list });
+});
+
+app.get("/api/share/:id/log", requireApiKey, (req, res) => {
+  const sh = shares.get(req.params.id);
+  if (!sh) return res.status(404).json({ ok: false, error: "no such share" });
+  res.json({ ok: true, target: sh.target, visits: sh.visits, log: sh.log });
+});
+
+app.delete("/api/share/:id", requireApiKey, (req, res) => {
+  const ok = shares.delete(req.params.id);
+  res.json({ ok, error: ok ? null : "no such share" });
+});
+
+function shareHandler(req, res) {
+  const sh = shares.get(req.params.id);
+  if (!sh) return res.status(404).type("html").send(sharePageHtml("Expired", '<h1>Link expired</h1><p>This share was removed or never existed.</p>'));
+
+  if (sh.pass) {
+    const hdr = req.headers.authorization || "";
+    let valid = false;
+    if (hdr.startsWith("Basic ")) {
+      const dec = Buffer.from(hdr.slice(6), "base64").toString("utf8");
+      const ci  = dec.indexOf(":");
+      const u   = ci < 0 ? dec : dec.slice(0, ci);
+      const p   = ci < 0 ? ""  : dec.slice(ci + 1);
+      valid = u === sh.user &&
+        crypto.createHash("sha256").update(p).digest("hex") === sh.pass;
+    }
+    if (!valid) {
+      res.set("WWW-Authenticate", 'Basic realm="Kali Share", charset="UTF-8"');
+      return res.status(401).type("html").send(sharePageHtml("Login", '<h1>Login required</h1><p>Enter the username and password you were given.</p>'));
+    }
+  }
+
+  const ip = String((req.headers["x-forwarded-for"] || req.socket.remoteAddress || "")).split(",")[0].trim() || "unknown";
+  sh.visits++;
+  sh.log.push({ t: new Date().toISOString(), ip, path: req.params[0] || "/", ua: String(req.headers["user-agent"] || "").slice(0, 140) });
+  if (sh.log.length > 400) sh.log.shift();
+
+  const now = Date.now();
+  if (now - sh.lastPing > 15000) {
+    sh.lastPing = now;
+    shareNotify("\r\n\x1b[1;33m[share]\x1b[0m \x1b[1m" + ip + "\x1b[0m opened the link\x1b[0m\r\n");
+  }
+
+  let sub = sh.target;
+  if (req.params[0]) {
+    sub = path.resolve(sh.target, decodeURIComponent(req.params[0]));
+    if (sub !== sh.target && !sub.startsWith(sh.target + path.sep)) {
+      return res.status(403).type("html").send(sharePageHtml("Nope", "<h1>Forbidden</h1>"));
+    }
+  }
+  if (!fs.existsSync(sub)) return res.status(404).type("html").send(sharePageHtml("Missing", "<h1>Not found</h1>"));
+
+  if (fs.statSync(sub).isDirectory()) {
+    const idx = path.join(sub, "index.html");
+    if (fs.existsSync(idx)) return res.sendFile(idx);
+    return res.type("html").send(dirListing(sub, req.url));
+  }
+  return res.sendFile(sub);
+}
+app.get("/s/:id", shareHandler);
+app.get("/s/:id/*", shareHandler);
 
 /* ── Start ── */
 const PORT = process.env.PORT || 5000;
