@@ -106,8 +106,13 @@ RUN for bin in /usr/lib/nmap/nmap /usr/bin/nmap /usr/bin/hping3 \
          > /usr/bin/nmap \
     && chmod +x /usr/bin/nmap
 
+# ── 14a. Always-on Tor: proxychains4 routes every shell connection through tor ──
+RUN printf 'strict_chain\nquiet_mode\nproxy_dns\ntcp_read_time_out 15000\ntcp_connect_time_out 8000\nlocalnet 127.0.0.0/255.0.0.0\n[ProxyList]\nsocks5 127.0.0.1 9050\n' > /etc/proxychains4.conf \
+    && printf '#!/bin/sh\n# Pull uncensored local models (needs RAM \xe2\x80\x94 upgrade the plan first)\nollama pull dolphin-mistral:7b\nollama pull dolphin-llama3:8b\nollama pull wizard-vicuna-uncensored:7b\n' > /usr/local/bin/llm-pull \
+    && chmod +x /usr/local/bin/llm-pull
+
 # ── 14b. Extra tools (premium update) ────────────────────────────────────────
-RUN apt-get update && for t in feroxbuster netexec nuclei sherlock amass httpie testssl.sh theharvester fastfetch figlet zsh; do \
+RUN apt-get update && for t in feroxbuster netexec nuclei sherlock amass httpie testssl.sh theharvester fastfetch figlet zsh bettercap hcxtools hcxdumptool wifite; do \
     apt-get install -y --no-install-recommends "$t" 2>/dev/null || echo "[warn] apt install failed: $t"; \
     done \
     && apt-get clean
@@ -131,4 +136,4 @@ RUN npm install --build-from-source
 COPY . .
 
 EXPOSE 5000
-CMD ["node", "server.js"]
+CMD ["/bin/bash", "start.sh"]

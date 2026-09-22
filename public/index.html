@@ -7,6 +7,10 @@
 <meta name="apple-mobile-web-app-capable" content="yes"/>
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
 <meta name="theme-color" content="#000"/>
+<meta name="apple-mobile-web-app-title" content="Kali"/>
+<link rel="apple-touch-icon" href="icon-180.png"/>
+<link rel="icon" type="image/png" sizes="192x192" href="icon-192.png"/>
+<link rel="manifest" href="manifest.webmanifest"/>
 <title>Kali Terminal</title>
 <link rel="stylesheet" href="https://unpkg.com/xterm@5.3.0/css/xterm.css"/>
 <script src="https://unpkg.com/xterm@5.3.0/lib/xterm.js"></script>
@@ -197,6 +201,25 @@ html,body{
 #ksend{flex:1.35;background:#32d74b;color:#06280f;font-weight:800;font-size:12px;letter-spacing:.4px;}
 #ksend:active,#ksend.flash{background:#45e357;transform:scale(0.96);}
 
+/* ─── Command history (sidebar) ─── */
+#hlist{
+  max-height:38vh;overflow-y:auto;
+  -webkit-overflow-scrolling:touch;
+  scrollbar-width:none;
+}
+#hlist::-webkit-scrollbar{display:none;}
+.hitem{
+  padding:11px 16px;
+  border-bottom:0.5px solid rgba(255,255,255,0.06);
+  font-family:ui-monospace,'SF Mono',Menlo,monospace;
+  font-size:12px;color:#c9ced6;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+  cursor:pointer;touch-action:manipulation;
+  -webkit-user-select:none;user-select:none;
+}
+.hitem:active{background:rgba(255,255,255,0.05);}
+.hitem .hidx{color:#62666d;margin-right:8px;}
+
 /* ─── Toast ─── */
 #toast{
   position:fixed;left:50%;
@@ -216,10 +239,10 @@ html,body{
 #mmask{display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:80;}
 #mmask.open{display:block;}
 #menu{
-  position:fixed;top:0;right:0;bottom:0;width:280px;
+  position:fixed;top:0;left:0;bottom:0;width:292px;
   background:#0d0e10;
-  border-left:0.5px solid rgba(255,255,255,0.08);
-  z-index:81;transform:translateX(110%);
+  border-right:0.5px solid rgba(255,255,255,0.08);
+  z-index:81;transform:translateX(-110%);
   transition:transform .26s cubic-bezier(.32,.72,.35,1);
   display:flex;flex-direction:column;
   overflow-y:auto;
@@ -405,6 +428,11 @@ html,body{
     <span id="mclose">&#x2715;</span>
   </div>
   <div id="notifbtn">&#x1F514; Enable notifications</div>
+  <div class="mgroup">
+    <div class="msec">Command History</div>
+    <div id="hlist"></div>
+    <div class="mrow" id="mhistclear"><span class="mi">&#128465;</span><span class="ml">Clear History</span></div>
+  </div>
   <div class="mgroup">
     <div class="msec">Display</div>
     <div class="mrow" style="cursor:default">
@@ -823,6 +851,7 @@ function renderTabs(){
 function openMenu(){
   document.getElementById('menu').classList.add('open');
   document.getElementById('mmask').classList.add('open');
+  try{ renderHist(); }catch(_){}
 }
 function closeMenu(){
   document.getElementById('menu').classList.remove('open');
@@ -963,6 +992,44 @@ function wireXk(el){
   el.addEventListener('mousedown', fire, false);
 }
 document.querySelectorAll('.xk').forEach(wireXk);
+
+/* ─── Command history (sidebar) ─── */
+function renderHist(){
+  var el = document.getElementById('hlist');
+  if(!el) return;
+  var items = cmdHist.slice(-40).reverse();
+  if(!items.length){
+    el.innerHTML = '<div class="hitem" style="color:#62666d;cursor:default">No commands yet</div>';
+    return;
+  }
+  var frag = document.createDocumentFragment();
+  items.forEach(function(cmd, i){
+    var d = document.createElement('div');
+    d.className = 'hitem';
+    var idx = document.createElement('span');
+    idx.className = 'hidx';
+    idx.textContent = String(items.length - i).padStart(2,'0');
+    d.appendChild(idx);
+    d.appendChild(document.createTextNode(cmd));
+    quickTap(d, function(){
+      closeMenu();
+      send(cmd);
+      send('\r');
+      toast('Ran: ' + (cmd.length>18 ? cmd.slice(0,18)+'\u2026' : cmd));
+      kbFocus();
+    });
+    frag.appendChild(d);
+  });
+  el.innerHTML = '';
+  el.appendChild(frag);
+}
+quickTap(document.getElementById('mhistclear'), function(){
+  cmdHist.length = 0;
+  try{ localStorage.setItem('kali_cmd_hist','[]'); }catch(_){}
+  renderHist();
+  toast('History cleared');
+  kbFocus();
+});
 
 /* ─── Menu: paste + copy actions ─── */
 quickTap(document.getElementById('mpaste'), function(){ closeMenu(); openPasteSheet(); });

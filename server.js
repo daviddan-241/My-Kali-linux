@@ -91,7 +91,7 @@ echo ""
 fs.chmodSync(INIT_FILE, 0o755);
 
 /* ── Session store ── */
-const IDLE_MS  = 12 * 60 * 60 * 1000;  // 12h idle → kill PTY (survive backgrounding)
+const IDLE_MS  = 24 * 60 * 60 * 1000;  // 24h idle → kill PTY (survive backgrounding)
 const BUF_MAX  = 131072;            // 128 KB replay buffer per session
 const sessions = new Map();
 
@@ -103,6 +103,26 @@ function genToken() { return crypto.randomBytes(16).toString("hex"); }
 
 function spawnShell(cols = 220, rows = 50) {
   const homeDir = process.env.HOME || "/home/runner";
+  const USE_TOR = fs.existsSync("/usr/bin/proxychains4") && fs.existsSync("/usr/bin/tor");
+  if (USE_TOR) {
+    return pty.spawn("proxychains4", ["-q", "-f", "/etc/proxychains4.conf", "bash", "--rcfile", INIT_FILE, "-i"], {
+    name: "xterm-256color",
+    cols,
+    rows,
+    cwd: homeDir,
+    env: {
+      ...process.env,
+      TERM:        "xterm-256color",
+      COLORTERM:   "truecolor",
+      LANG:        "en_US.UTF-8",
+      LC_ALL:      "C.UTF-8",
+      DEBIAN_FRONTEND: "noninteractive",
+      HOME:        homeDir,
+      USER:        process.env.USER || "runner",
+      LOGNAME:     process.env.USER || "runner",
+    },
+  });
+  }
   return pty.spawn("bash", ["--rcfile", INIT_FILE, "-i"], {
     name: "xterm-256color",
     cols,
@@ -356,3 +376,13 @@ const PORT = process.env.PORT || 5000;
 server.listen(PORT, "0.0.0.0", () =>
   console.log(`Kali Terminal on port ${PORT}`)
 );
+
+/* ── Keep-awake: self-ping every 10 min so the free instance never idles out ── */
+const SELF_URL = process.env.RENDER_EXTERNAL_URL || process.env.SELF_URL || "";
+if (SELF_URL) {
+  setInterval(() => {
+    fetch(SELF_URL + "/")
+      .then((r) => console.log(`[keep-awake] ${r.status}`))
+      .catch(() => {});
+  }, 10 * 60 * 1000).unref();
+}
