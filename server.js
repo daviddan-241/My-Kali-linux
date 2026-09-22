@@ -57,6 +57,9 @@ export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
 [ -f /etc/bash.bashrc ] && source /etc/bash.bashrc 2>/dev/null || true
 [ -f ${HOME_DIR}/.bashrc ] && source ${HOME_DIR}/.bashrc 2>/dev/null || true
 
+# Escape hatch: run a command outside tor (example: notor curl ipinfo.io)
+alias notor='LD_PRELOAD='
+
 # Prompt
 PS1='\\[\\033[1;31m\\]┌──(\\[\\033[1;32m\\]${SHELL_USER}㉿kali\\[\\033[1;31m\\])-[\\[\\033[0;1m\\]\\w\\[\\033[1;31m\\]]\\n\\[\\033[1;31m\\]└─\\[\\033[1;32m\\]# \\[\\033[0m\\]'
 export PS1
