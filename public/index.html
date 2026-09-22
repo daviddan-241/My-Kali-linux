@@ -459,8 +459,8 @@ html,body{
 <div id="pmask"></div>
 <div id="psheet">
   <div id="phead"><span>Paste</span><span id="pclose">&#x2715;</span></div>
-  <textarea id="ptxt" rows="5" placeholder="Paste text here..." autocomplete="off" autocorrect="off" autocapitalize="none" spellcheck="false"></textarea>
-  <div id="psend">SEND TO TERMINAL</div>
+  <textarea id="ptxt" rows="5" placeholder="Long-press here, then tap Paste" autocomplete="off" autocorrect="off" autocapitalize="none" spellcheck="false"></textarea>
+  <div id="psend">PASTE INTO TERMINAL</div>
 </div>
 
 <script>
@@ -926,6 +926,14 @@ function openPasteSheet(){
   document.getElementById('pmask').classList.add('open');
   setTimeout(function(){ try{ document.getElementById('ptxt').focus(); }catch(_){} }, 60);
 }
+/* Long-press → iOS Paste callout → goes straight to the terminal */
+document.getElementById('ptxt').addEventListener('paste', function(e){
+  var t = (e.clipboardData || window.clipboardData).getData('text');
+  e.preventDefault();
+  document.getElementById('ptxt').value = '';
+  closePasteSheet();
+  sendPaste(t);
+});
 function closePasteSheet(){
   document.getElementById('psheet').classList.remove('open');
   document.getElementById('pmask').classList.remove('open');
@@ -934,7 +942,7 @@ function tryClipboardRead(){
   if (navigator.clipboard && navigator.clipboard.readText) {
     navigator.clipboard.readText().then(function(t){
       if (t) sendPaste(t); else toast('Clipboard is empty');
-    }).catch(function(){ toast('Paste blocked \u2014 use menu \u2192 Paste'); });
+    }).catch(function(){ openPasteSheet(); });
   } else { openPasteSheet(); }
 }
 quickTap(document.getElementById('pclose'), function(){ closePasteSheet(); kbFocus(); });
@@ -945,7 +953,7 @@ quickTap(document.getElementById('psend'), function(){
   closePasteSheet();
   sendPaste(t);
 });
-keyBtn('kpaste', function(){ tryClipboardRead(); });
+quickTap(document.getElementById('kpaste'), function(){ tryClipboardRead(); });
 keyBtn('ksend',  function(){ pushHist(pendLine); send('\r'); kbFocus(); });
 
 /* ─── Toast ─── */
@@ -1025,7 +1033,7 @@ quickTap(document.getElementById('mhistclear'), function(){
 });
 
 /* ─── Menu: paste + copy actions ─── */
-quickTap(document.getElementById('mpaste'), function(){ closeMenu(); openPasteSheet(); });
+quickTap(document.getElementById('mpaste'), function(){ closeMenu(); tryClipboardRead(); });
 quickTap(document.getElementById('mcopy'), function(){
   var sel='';
   try{ sel = term.getSelection(); }catch(_){}
