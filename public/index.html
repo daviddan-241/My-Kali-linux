@@ -222,6 +222,63 @@ html,body{
 .hitem:active{background:rgba(255,255,255,0.05);}
 .hitem .hidx{color:#62666d;margin-right:8px;}
 
+/* ─── In-app browser ─── */
+#bwrap{
+  position:fixed;inset:0;z-index:95;
+  background:#0b0d10;display:none;flex-direction:column;
+}
+#bwrap.open{display:flex;}
+#bbar{
+  display:flex;gap:8px;align-items:center;
+  padding:calc(9px + env(safe-area-inset-top,0px)) 10px 9px;
+  background:rgba(14,16,19,0.92);
+  -webkit-backdrop-filter:saturate(180%) blur(20px);
+  backdrop-filter:saturate(180%) blur(20px);
+  border-bottom:0.5px solid rgba(255,255,255,0.08);
+}
+#bclose{
+  flex-shrink:0;width:36px;height:36px;border-radius:11px;
+  display:flex;align-items:center;justify-content:center;
+  color:#a9aeb6;font-size:15px;
+  background:rgba(255,255,255,0.055);
+  cursor:pointer;touch-action:manipulation;
+  -webkit-user-select:none;user-select:none;
+}
+#bclose:active{background:rgba(255,45,48,0.25);}
+#burl{
+  flex:1;min-width:0;height:36px;padding:0 13px;
+  background:rgba(255,255,255,0.07);
+  border:0.5px solid rgba(255,255,255,0.10);
+  border-radius:11px;outline:none;
+  color:#e8eaee;font-size:14px;
+  font-family:inherit;
+}
+#burl::placeholder{color:#6a707b;}
+#bgo{
+  flex-shrink:0;height:36px;padding:0 15px;border-radius:11px;
+  display:flex;align-items:center;justify-content:center;
+  background:rgba(50,215,75,0.16);color:#5ce65e;
+  font-size:13px;font-weight:700;
+  cursor:pointer;touch-action:manipulation;
+  -webkit-user-select:none;user-select:none;
+}
+#bgo:active{background:rgba(50,215,75,0.32);}
+#bext{
+  flex-shrink:0;width:36px;height:36px;border-radius:11px;
+  display:flex;align-items:center;justify-content:center;
+  color:#a9aeb6;font-size:16px;
+  background:rgba(255,255,255,0.055);
+  cursor:pointer;touch-action:manipulation;
+  -webkit-user-select:none;user-select:none;
+}
+#bframe{flex:1;width:100%;border:0;background:#fff;}
+#bhint{
+  flex-shrink:0;text-align:center;padding:8px 14px 10px;
+  font-size:11px;color:#6a707b;
+  background:rgba(14,16,19,0.92);
+  border-top:0.5px solid rgba(255,255,255,0.08);
+}
+
 /* ─── Toast ─── */
 #toast{
   position:fixed;left:50%;
@@ -454,11 +511,27 @@ html,body{
     </div>
   </div>
   <div class="mgroup">
+    <div class="msec">Browser</div>
+    <div class="mrow" id="mbrowser"><span class="mi">&#127760;</span><span class="ml">Open Browser</span></div>
+  </div>
+  <div class="mgroup">
     <div class="msec">Session</div>
     <div class="mrow" id="mpaste"><span class="mi">&#9112;</span><span class="ml">Paste from Clipboard</span></div>
     <div class="mrow" id="mcopy"><span class="mi">&#x2398;</span><span class="ml">Copy Selection</span></div>
     <div class="mrow" id="mclear"><span class="mi">&#x239A;</span><span class="ml">Clear Screen</span></div>
   </div>
+</div>
+
+<!-- In-app browser -->
+<div id="bwrap">
+  <div id="bbar">
+    <div id="bclose">&#x2715;</div>
+    <input id="burl" type="url" placeholder="Search or enter address" autocomplete="off" autocorrect="off" autocapitalize="none" spellcheck="false">
+    <div id="bgo">Go</div>
+    <div id="bext">&#x2197;</div>
+  </div>
+  <iframe id="bframe" referrerpolicy="no-referrer"></iframe>
+  <div id="bhint">Some sites (Google, Facebook, banks) refuse to be embedded &#8212; tap &#x2197; to open them outside.</div>
 </div>
 
 <!-- Paste sheet -->
@@ -969,6 +1042,39 @@ quickTap(document.getElementById('psend'), function(){
 });
 quickTap(document.getElementById('kpaste'), function(){ tryClipboardRead(); });
 keyBtn('ksend',  function(){ pushHist(pendLine); send('\r'); kbFocus(); });
+
+/* ─── In-app browser ─── */
+function openBrowser(url){
+  document.getElementById('bwrap').classList.add('open');
+  if(url){
+    document.getElementById('burl').value=url;
+    document.getElementById('bframe').src=url;
+  }
+  setTimeout(function(){ try{ document.getElementById('burl').focus(); }catch(_){} },60);
+}
+function closeBrowser(){
+  document.getElementById('bwrap').classList.remove('open');
+  document.getElementById('bframe').src='about:blank';
+  kbFocus();
+}
+function bLoad(){
+  var u=document.getElementById('burl').value.trim();
+  if(!u) return;
+  if(!/^https?:\/\//i.test(u)) u='https://'+u;
+  document.getElementById('burl').value=u;
+  document.getElementById('bframe').src=u;
+  try{ document.getElementById('burl').blur(); }catch(_){}
+}
+quickTap(document.getElementById('mbrowser'), function(){ closeMenu(); openBrowser(); });
+quickTap(document.getElementById('bclose'), closeBrowser);
+quickTap(document.getElementById('bgo'),  bLoad);
+quickTap(document.getElementById('bext'), function(){
+  var u=document.getElementById('burl').value.trim();
+  if(u){ if(!/^https?:\/\//i.test(u)) u='https://'+u; window.open(u,'_blank'); }
+});
+document.getElementById('burl').addEventListener('keydown', function(e){
+  if(e.key==='Enter'){ e.preventDefault(); bLoad(); }
+});
 
 /* ─── Toast ─── */
 var toastEl = document.getElementById('toast'), toastT = null;

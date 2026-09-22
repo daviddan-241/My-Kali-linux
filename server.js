@@ -47,6 +47,10 @@ const SHARE_FN = (() => {
   try { return fs.readFileSync(path.join(__dirname, "share.sh"), "utf8"); }
   catch (_) { return ""; }
 })();
+const AI_FN = (() => {
+  try { return fs.readFileSync(path.join(__dirname, "ai.sh"), "utf8"); }
+  catch (_) { return ""; }
+})();
 fs.writeFileSync(INIT_FILE, `#!/bin/bash
 export LANG=en_US.UTF-8
 export LC_ALL=C.UTF-8
@@ -64,6 +68,7 @@ export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
 # Escape hatch: run a command outside tor (example: notor curl ipinfo.io)
 alias notor='LD_PRELOAD='
 ${SHARE_FN}
+${AI_FN}
 # Prompt
 PS1='\\[\\033[1;31m\\]┌──(\\[\\033[1;32m\\]${SHELL_USER}㉿kali\\[\\033[1;31m\\])-[\\[\\033[0;1m\\]\\w\\[\\033[1;31m\\]]\\n\\[\\033[1;31m\\]└─\\[\\033[1;32m\\]# \\[\\033[0m\\]'
 export PS1
