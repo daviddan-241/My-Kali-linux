@@ -304,11 +304,24 @@ html,body{
   z-index:81;transform:translateX(-110%);
   transition:transform .26s cubic-bezier(.32,.72,.35,1);
   display:flex;flex-direction:column;
-  overflow-y:auto;-webkit-overflow-scrolling:touch;
-  scroll-behavior:smooth;overscroll-behavior:contain;
   padding-top:calc(56px + env(safe-area-inset-top,0px));
-  padding-bottom:calc(24px + env(safe-area-inset-bottom,0px));
+  padding-bottom:calc(10px + env(safe-area-inset-bottom,0px));
 }
+/* Sessions owns the entire body of the sidebar — real room, real scroll */
+#sgroup{flex:1 1 auto;min-height:0;display:flex;flex-direction:column;margin-bottom:8px;}
+#sgroup #stabs{flex:1 1 auto;min-height:0;overflow-y:auto;-webkit-overflow-scrolling:touch;scroll-behavior:smooth;overscroll-behavior:contain;scrollbar-width:none;}
+#sgroup #stabs::-webkit-scrollbar{display:none;}
+/* Small Settings entry point, tucked at the bottom — out of the way of Sessions */
+#msettingsrow{
+  flex-shrink:0;display:flex;align-items:center;gap:10px;
+  margin:0 14px;padding:12px 14px;border-radius:12px;
+  background:rgba(255,255,255,0.045);
+  color:#9aa0a8;font-size:14px;font-weight:600;
+  cursor:pointer;touch-action:manipulation;
+  -webkit-user-select:none;user-select:none;
+}
+#msettingsrow:active{background:rgba(255,255,255,0.08);}
+#msettingsrow .mi{font-size:15px;}
 #menu.open{transform:translateX(0);box-shadow:26px 0 70px rgba(0,0,0,0.55);}
 #mhead{
   display:flex;align-items:center;justify-content:space-between;
@@ -355,15 +368,6 @@ html,body{
   touch-action:manipulation;-webkit-user-select:none;user-select:none;
 }
 .topt.on{background:rgba(50,215,75,0.12);border-color:rgba(50,215,75,0.5);color:#5ce65e;}
-#notifbtn{
-  margin:10px 18px 2px;padding:11px 14px;
-  background:rgba(94,158,255,0.10);border:0.5px solid rgba(94,158,255,0.35);
-  border-radius:12px;text-align:center;font-size:13px;font-weight:600;color:#9ecbff;
-  cursor:pointer;touch-action:manipulation;-webkit-user-select:none;user-select:none;
-  display:none;
-}
-#notifbtn.show{display:block;}
-
 /* ─── Paste sheet — iOS style ─── */
 #pmask{display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:90;}
 #pmask.open{display:block;}
@@ -393,6 +397,47 @@ html,body{
   cursor:pointer;touch-action:manipulation;-webkit-user-select:none;user-select:none;
 }
 #psend:active{background:#45e357;}
+
+/* ─── Settings sheet — iOS style, same language as Paste sheet ─── */
+#smask{display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:90;}
+#smask.open{display:block;}
+#ssheet{
+  position:fixed;left:0;right:0;bottom:0;z-index:91;max-height:80vh;overflow-y:auto;
+  -webkit-overflow-scrolling:touch;scroll-behavior:smooth;
+  background:#141518;
+  border-top:0.5px solid rgba(255,255,255,0.12);
+  border-radius:16px 16px 0 0;
+  transform:translateY(110%);
+  transition:transform .28s cubic-bezier(.32,.72,.35,1);
+  padding:14px 16px max(14px, env(safe-area-inset-bottom, 14px));
+}
+#ssheet.open{transform:translateY(0);}
+#shead{display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;}
+#shead span:first-child{font-size:17px;font-weight:700;color:#f2f3f5;}
+#sclose{color:#7c828b;font-size:18px;cursor:pointer;padding:2px 8px;touch-action:manipulation;-webkit-user-select:none;user-select:none;}
+.ssec{
+  padding:14px 2px 8px;font-size:11px;font-weight:600;letter-spacing:1.2px;
+  text-transform:uppercase;color:#62666d;
+}
+#ssheet .mrow{border-radius:11px;margin-bottom:2px;background:rgba(255,255,255,0.045);}
+#ssheet .mrow:not(:last-child){margin-bottom:6px;}
+#s-notif{
+  display:flex;align-items:center;gap:10px;margin-top:4px;padding:12px 14px;border-radius:11px;
+  background:rgba(10,132,255,0.16);color:#5ab3ff;font-weight:700;font-size:14px;
+  cursor:pointer;touch-action:manipulation;-webkit-user-select:none;user-select:none;
+  display:none;
+}
+#s-notif.show{display:flex;}
+/* Compact pill button (Browser) — small, doesn't need a full-width row */
+.sbtn{
+  display:inline-flex;align-items:center;gap:8px;
+  padding:9px 16px;border-radius:20px;
+  background:rgba(10,132,255,0.16);color:#5ab3ff;
+  font-size:13px;font-weight:700;
+  cursor:pointer;touch-action:manipulation;
+  -webkit-user-select:none;user-select:none;
+}
+.sbtn:active{background:rgba(10,132,255,0.30);}
 </style>
 </head>
 <body>
@@ -484,39 +529,40 @@ html,body{
     <span>Kali</span>
     <span id="mclose">&#x2715;</span>
   </div>
-  <div id="notifbtn">&#x1F514; Enable notifications</div>
-  <div class="mgroup">
+  <div class="mgroup" id="sgroup">
     <div class="msec">Sessions</div>
     <div class="mrow" id="mnew"><span class="mi">+</span><span class="ml">New Terminal</span></div>
     <div id="stabs"></div>
   </div>
-  <div class="mgroup">
-    <div class="msec">Display</div>
-    <div class="mrow" style="cursor:default">
-      <span class="mi">A</span>
-      <span class="ml">Font Size</span>
-      <div class="fsrow">
-        <div class="fsbtn" id="fsm">&#8722;</div>
-        <div id="fsval">14</div>
-        <div class="fsbtn" id="fsp">+</div>
-      </div>
+  <div id="msettingsrow"><span class="mi">&#9881;&#xFE0F;</span><span class="ml">Settings</span></div>
+</div>
+
+<!-- Settings sheet -->
+<div id="smask"></div>
+<div id="ssheet">
+  <div id="shead"><span>Settings</span><span id="sclose">&#x2715;</span></div>
+  <div id="s-notif"><span class="mi">&#x1F514;</span><span class="ml">Enable notifications</span></div>
+  <div class="ssec">Display</div>
+  <div class="mrow" style="cursor:default">
+    <span class="mi">A</span>
+    <span class="ml">Font Size</span>
+    <div class="fsrow">
+      <div class="fsbtn" id="fsm">&#8722;</div>
+      <div id="fsval">14</div>
+      <div class="fsbtn" id="fsp">+</div>
     </div>
-    <div class="themes">
-      <div class="topt" data-t="kali">Kali</div>
-      <div class="topt" data-t="matrix">Matrix</div>
-      <div class="topt" data-t="dracula">Dracula</div>
-    </div>
   </div>
-  <div class="mgroup">
-    <div class="msec">Browser</div>
-    <div class="mrow" id="mbrowser"><span class="mi">&#127760;</span><span class="ml">Open Browser</span></div>
+  <div class="themes">
+    <div class="topt" data-t="kali">Kali</div>
+    <div class="topt" data-t="matrix">Matrix</div>
+    <div class="topt" data-t="dracula">Dracula</div>
   </div>
-  <div class="mgroup">
-    <div class="msec">Session</div>
-    <div class="mrow" id="mpaste"><span class="mi">&#9112;</span><span class="ml">Paste from Clipboard</span></div>
-    <div class="mrow" id="mcopy"><span class="mi">&#x2398;</span><span class="ml">Copy Selection</span></div>
-    <div class="mrow" id="mclear"><span class="mi">&#x239A;</span><span class="ml">Clear Screen</span></div>
-  </div>
+  <div class="ssec">Browser</div>
+  <div id="mbrowser" class="sbtn"><span class="mi">&#127760;</span><span class="ml">Open Browser</span></div>
+  <div class="ssec">Session</div>
+  <div class="mrow" id="mpaste"><span class="mi">&#9112;</span><span class="ml">Paste from Clipboard</span></div>
+  <div class="mrow" id="mcopy"><span class="mi">&#x2398;</span><span class="ml">Copy Selection</span></div>
+  <div class="mrow" id="mclear"><span class="mi">&#x239A;</span><span class="ml">Clear Screen</span></div>
 </div>
 
 <!-- In-app browser -->
@@ -934,7 +980,7 @@ quickTap(document.getElementById('mclose'), closeMenu);
 quickTap(document.getElementById('mnew'),  function(){ newSession(); closeMenu(); });
 quickTap(document.getElementById('mclear'),function(){
   var s=getActive(); if(s) s.buf='';
-  term.clear(); closeMenu(); kbFocus();
+  term.clear(); closeSettings(); kbFocus();
 });
 
 /* ─── Font size ─── */
@@ -967,11 +1013,11 @@ applyTheme(curTheme);
 var notifOk = typeof Notification!=='undefined' && Notification.permission==='granted';
 function updateNotifBtn(){
   if(typeof Notification==='undefined') return;
-  document.getElementById('notifbtn').classList.toggle('show', Notification.permission==='default');
+  document.getElementById('s-notif').classList.toggle('show', Notification.permission==='default');
   notifOk = Notification.permission==='granted';
 }
 updateNotifBtn();
-quickTap(document.getElementById('notifbtn'), function(){
+quickTap(document.getElementById('s-notif'), function(){
   if(typeof Notification==='undefined') return;
   Notification.requestPermission().then(updateNotifBtn);
 });
@@ -1023,6 +1069,19 @@ function tryClipboardRead(){
 }
 quickTap(document.getElementById('pclose'), function(){ closePasteSheet(); kbFocus(); });
 quickTap(document.getElementById('pmask'),  function(){ closePasteSheet(); kbFocus(); });
+
+/* ─── Settings sheet ─── */
+function openSettings(){
+  document.getElementById('ssheet').classList.add('open');
+  document.getElementById('smask').classList.add('open');
+}
+function closeSettings(){
+  document.getElementById('ssheet').classList.remove('open');
+  document.getElementById('smask').classList.remove('open');
+}
+quickTap(document.getElementById('msettingsrow'), function(){ closeMenu(); openSettings(); });
+quickTap(document.getElementById('sclose'), closeSettings);
+quickTap(document.getElementById('smask'), function(){ closeSettings(); kbFocus(); });
 quickTap(document.getElementById('psend'), function(){
   var t = document.getElementById('ptxt').value;
   document.getElementById('ptxt').value = '';
@@ -1054,7 +1113,7 @@ function bLoad(){
   document.getElementById('bframe').src=u;
   try{ document.getElementById('burl').blur(); }catch(_){}
 }
-quickTap(document.getElementById('mbrowser'), function(){ closeMenu(); openBrowser(); });
+quickTap(document.getElementById('mbrowser'), function(){ closeSettings(); openBrowser(); });
 quickTap(document.getElementById('bclose'), closeBrowser);
 quickTap(document.getElementById('bgo'),  bLoad);
 quickTap(document.getElementById('bext'), function(){
@@ -1104,7 +1163,7 @@ function wireXk(el){
 document.querySelectorAll('.xk').forEach(wireXk);
 
 /* ─── Menu: paste + copy actions ─── */
-quickTap(document.getElementById('mpaste'), function(){ closeMenu(); tryClipboardRead(); });
+quickTap(document.getElementById('mpaste'), function(){ closeSettings(); tryClipboardRead(); });
 quickTap(document.getElementById('mcopy'), function(){
   var sel='';
   try{ sel = term.getSelection(); }catch(_){}
