@@ -124,6 +124,21 @@ RUN (set -e; curl -fsSL https://ollama.com/download/ollama-linux-amd64.tgz -o /t
     && rm -f /tmp/ol.tgz) \
     || echo "[warn] ollama install skipped"
 
+# ── 14d. More tools requested — recon/forensics/dev extras not already above ─
+RUN apt-get update && for t in radare2 rlwrap sshpass rsync hashid \
+    wireguard-tools openvpn tree ncdu bind9-dnsutils iperf3; do \
+    apt-get install -y --no-install-recommends "$t" 2>/dev/null || echo "[warn] apt install failed: $t"; \
+    done \
+    && apt-get clean
+
+# ── 14e. Cloudflare Tunnel — instant public HTTPS link for ANY local port,
+#    no account needed (cloudflared quick tunnel). Complements 'share'
+#    (files/folders) by exposing a running app/server on any port. ───────────
+RUN curl -fsSL https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64 \
+      -o /usr/local/bin/cloudflared \
+    && chmod +x /usr/local/bin/cloudflared \
+    || echo "[warn] cloudflared install skipped"
+
 # ── 15. Node.js 20 ───────────────────────────────────────────────────────────
 RUN curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
     && apt-get install -y nodejs build-essential \

@@ -56,16 +56,28 @@ html,body{
 }
 #menubtn:active{background:rgba(50,215,75,0.18);}
 #menubtn{box-shadow:0 4px 18px rgba(0,0,0,0.45);}
-/* ─── Sessions (sidebar rows) ─── */
-#stabs{
-  max-height:26vh;overflow-y:auto;
-  -webkit-overflow-scrolling:touch;
-  scrollbar-width:none;
+#newbtn{
+  position:fixed;
+  top:calc(10px + env(safe-area-inset-top,0px));
+  left:56px;
+  width:38px;height:38px;
+  display:flex;align-items:center;justify-content:center;
+  color:#5ce65e;font-size:22px;font-weight:300;
+  background:rgba(20,22,26,0.72);
+  -webkit-backdrop-filter:saturate(180%) blur(18px);
+  backdrop-filter:saturate(180%) blur(18px);
+  border:0.5px solid rgba(255,255,255,0.10);
+  border-radius:12px;
+  box-shadow:0 4px 18px rgba(0,0,0,0.45);
+  z-index:60;
+  cursor:pointer;touch-action:manipulation;
+  -webkit-user-select:none;user-select:none;
 }
-#stabs::-webkit-scrollbar{display:none;}
+#newbtn:active{background:rgba(50,215,75,0.22);}
+/* ─── Sessions (sidebar rows) ─── */
 .tab{
   flex-shrink:0;display:flex;align-items:center;gap:8px;
-  margin:5px 12px;padding:11px 14px;border-radius:11px;
+  margin:6px 14px;padding:13px 15px;border-radius:11px;
   background:rgba(255,255,255,0.055);
   border:0.5px solid transparent;
   cursor:pointer;touch-action:manipulation;
@@ -101,6 +113,8 @@ html,body{
   overflow-y:auto!important;
   -webkit-overflow-scrolling:touch;
   overscroll-behavior:contain;
+  scroll-behavior:smooth;
+  will-change:scroll-position;
 }
 
 /* Transparent textarea — captures mobile keyboard input */
@@ -203,25 +217,6 @@ html,body{
 #ksend{flex:1.35;background:#32d74b;color:#06280f;font-weight:800;font-size:12px;letter-spacing:.4px;}
 #ksend:active,#ksend.flash{background:#45e357;transform:scale(0.96);}
 
-/* ─── Command history (sidebar) ─── */
-#hlist{
-  max-height:38vh;overflow-y:auto;
-  -webkit-overflow-scrolling:touch;
-  scrollbar-width:none;
-}
-#hlist::-webkit-scrollbar{display:none;}
-.hitem{
-  padding:11px 16px;
-  border-bottom:0.5px solid rgba(255,255,255,0.06);
-  font-family:ui-monospace,'SF Mono',Menlo,monospace;
-  font-size:12px;color:#c9ced6;
-  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
-  cursor:pointer;touch-action:manipulation;
-  -webkit-user-select:none;user-select:none;
-}
-.hitem:active{background:rgba(255,255,255,0.05);}
-.hitem .hidx{color:#62666d;margin-right:8px;}
-
 /* ─── In-app browser ─── */
 #bwrap{
   position:fixed;inset:0;z-index:95;
@@ -304,9 +299,10 @@ html,body{
   z-index:81;transform:translateX(-110%);
   transition:transform .26s cubic-bezier(.32,.72,.35,1);
   display:flex;flex-direction:column;
-  overflow-y:auto;
-  padding-top:env(safe-area-inset-top,0px);
-  padding-bottom:env(safe-area-inset-bottom,0px);
+  overflow-y:auto;-webkit-overflow-scrolling:touch;
+  scroll-behavior:smooth;overscroll-behavior:contain;
+  padding-top:calc(56px + env(safe-area-inset-top,0px));
+  padding-bottom:calc(24px + env(safe-area-inset-bottom,0px));
 }
 #menu.open{transform:translateX(0);box-shadow:26px 0 70px rgba(0,0,0,0.55);}
 #mhead{
@@ -320,15 +316,15 @@ html,body{
   color:#7c828b;font-size:18px;cursor:pointer;padding:2px 8px;
   touch-action:manipulation;-webkit-user-select:none;user-select:none;
 }
-.mgroup{margin:8px 14px;border-radius:14px;background:rgba(255,255,255,0.045);overflow:hidden;}
+.mgroup{margin:16px 14px;border-radius:14px;background:rgba(255,255,255,0.045);overflow:hidden;}
 .mgroup .mrow:last-child,.mgroup .themes{border-bottom:none;}
 .msec{
-  padding:12px 16px 6px;font-size:11px;font-weight:600;letter-spacing:1.2px;
+  padding:14px 16px 8px;font-size:11px;font-weight:600;letter-spacing:1.2px;
   text-transform:uppercase;color:#62666d;
 }
 .mrow{
   display:flex;align-items:center;gap:12px;
-  padding:13px 16px;border-bottom:0.5px solid rgba(255,255,255,0.06);
+  padding:15px 16px;border-bottom:0.5px solid rgba(255,255,255,0.06);
   cursor:pointer;touch-action:manipulation;
   -webkit-user-select:none;user-select:none;
 }
@@ -399,6 +395,7 @@ html,body{
 
   <!-- Floating menu button -->
   <div id="menubtn">&#9776;</div>
+  <div id="newbtn">+</div>
 
   <!-- Terminal area -->
   <div id="term-area">
@@ -485,13 +482,8 @@ html,body{
   <div id="notifbtn">&#x1F514; Enable notifications</div>
   <div class="mgroup">
     <div class="msec">Sessions</div>
-    <div id="stabs"></div>
     <div class="mrow" id="mnew"><span class="mi">+</span><span class="ml">New Terminal</span></div>
-  </div>
-  <div class="mgroup">
-    <div class="msec">Command History</div>
-    <div id="hlist"></div>
-    <div class="mrow" id="mhistclear"><span class="mi">&#128465;</span><span class="ml">Clear History</span></div>
+    <div id="stabs"></div>
   </div>
   <div class="mgroup">
     <div class="msec">Display</div>
@@ -589,18 +581,8 @@ var THEMES = {
 var fontSize = +(localStorage.getItem('kali_fs') || 14);
 var curTheme =   localStorage.getItem('kali_theme') || 'kali';
 
-/* ─── Command history memory ─── */
-var cmdHist = [];
-try { cmdHist = JSON.parse(localStorage.getItem('kali_cmd_hist') || '[]'); } catch(_) {}
 var pendLine = '';
-function pushHist(line){
-  pendLine = '';
-  line = (line||'').trim();
-  if(!line) return;
-  if(cmdHist[cmdHist.length-1] !== line){ cmdHist.push(line); }
-  if(cmdHist.length > 200) cmdHist = cmdHist.slice(-200);
-  try { localStorage.setItem('kali_cmd_hist', JSON.stringify(cmdHist)); } catch(_) {}
-}
+function pushHist(line){ pendLine = ''; }
 
 /* ─── xterm ─── */
 var _FA = window.FitAddon;
@@ -931,7 +913,6 @@ function renderTabs(){
 function openMenu(){
   document.getElementById('menu').classList.add('open');
   document.getElementById('mmask').classList.add('open');
-  try{ renderHist(); }catch(_){}
   try{ renderTabs(); }catch(_){}
 }
 function closeMenu(){
@@ -940,6 +921,7 @@ function closeMenu(){
 }
 
 quickTap(document.getElementById('menubtn'), openMenu);
+quickTap(document.getElementById('newbtn'), function(){ newSession(); toast('New terminal'); });
 quickTap(document.getElementById('mmask'),  closeMenu);
 quickTap(document.getElementById('mclose'), closeMenu);
 quickTap(document.getElementById('mnew'),  function(){ newSession(); closeMenu(); });
@@ -1113,44 +1095,6 @@ function wireXk(el){
   el.addEventListener('mousedown', fire, false);
 }
 document.querySelectorAll('.xk').forEach(wireXk);
-
-/* ─── Command history (sidebar) ─── */
-function renderHist(){
-  var el = document.getElementById('hlist');
-  if(!el) return;
-  var items = cmdHist.slice(-40).reverse();
-  if(!items.length){
-    el.innerHTML = '<div class="hitem" style="color:#62666d;cursor:default">No commands yet</div>';
-    return;
-  }
-  var frag = document.createDocumentFragment();
-  items.forEach(function(cmd, i){
-    var d = document.createElement('div');
-    d.className = 'hitem';
-    var idx = document.createElement('span');
-    idx.className = 'hidx';
-    idx.textContent = String(items.length - i).padStart(2,'0');
-    d.appendChild(idx);
-    d.appendChild(document.createTextNode(cmd));
-    quickTap(d, function(){
-      closeMenu();
-      send(cmd);
-      send('\r');
-      toast('Ran: ' + (cmd.length>18 ? cmd.slice(0,18)+'\u2026' : cmd));
-      kbFocus();
-    });
-    frag.appendChild(d);
-  });
-  el.innerHTML = '';
-  el.appendChild(frag);
-}
-quickTap(document.getElementById('mhistclear'), function(){
-  cmdHist.length = 0;
-  try{ localStorage.setItem('kali_cmd_hist','[]'); }catch(_){}
-  renderHist();
-  toast('History cleared');
-  kbFocus();
-});
 
 /* ─── Menu: paste + copy actions ─── */
 quickTap(document.getElementById('mpaste'), function(){ closeMenu(); tryClipboardRead(); });
