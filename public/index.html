@@ -274,6 +274,11 @@ html,body{
   border-top:0.5px solid rgba(255,255,255,0.08);
 }
 
+/* ─── Desktop: real keyboard owns the terminal, no mobile rail ─── */
+@media (pointer:fine) and (hover:hover){
+  #rail, #xkeys { display:none !important; }
+}
+
 /* ─── Toast ─── */
 #toast{
   position:fixed;left:50%;
@@ -695,7 +700,9 @@ document.getElementById('term-area').addEventListener('click', function(){ term.
 var kb  = document.getElementById('kb');
 var ZWS = '\u200b';
 function kbReset(){ try{kb.value=ZWS;}catch(_){} }
+var IS_DESKTOP = !!(window.matchMedia && window.matchMedia('(pointer:fine) and (hover:hover)').matches);
 function kbFocus(){
+  if(IS_DESKTOP){ try{ term.focus(); }catch(_){} return; }
   try{ kb.focus(); } catch(_){}
   setTimeout(function(){ try{ kb.focus(); } catch(_){} }, 40);
 }
@@ -1127,6 +1134,7 @@ if(saved.length){
   newSession();
 }
 setTimeout(function(){ resizeToVV(); kbFocus(); }, 250);
+if('serviceWorker' in navigator){ window.addEventListener('load', function(){ navigator.serviceWorker.register('sw.js').catch(function(){}); }); }
 </script>
 </body>
 </html>
