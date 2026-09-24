@@ -113,7 +113,6 @@ html,body{
   overflow-y:auto!important;
   -webkit-overflow-scrolling:touch;
   overscroll-behavior:contain;
-  scroll-behavior:smooth;
   will-change:scroll-position;
 }
 
@@ -685,12 +684,17 @@ new ResizeObserver(function(){ setTimeout(doFit,40); })
 
 /* ─── Scroll to bottom ─── */
 var gobot = document.getElementById('gobot');
-term.onScroll(function(){
+/* Pinned = "follow output". True when the user is at (or within 2 lines of) the bottom,
+   false only when they deliberately scrolled up into history. */
+var _pinned = true;
+function updatePinned(){
   try{
     var b = term.buffer.active;
-    gobot.classList.toggle('show', b.viewportY < b.length - term.rows - 1);
+    _pinned = b.viewportY >= b.length - term.rows - 2;
+    gobot.classList.toggle('show', !_pinned);
   }catch(_){}
-});
+}
+term.onScroll(updatePinned);
 quickTap(gobot, function(){
   term.scrollToBottom(); gobot.classList.remove('show'); kbFocus();
 });
@@ -882,10 +886,8 @@ function newSession(existToken, existName){
     s.buf += d;
     if(s.buf.length>131072) s.buf=s.buf.slice(-65536);
     if(activeId===id){
-      var b=term.buffer.active;
-      var atBot=b.viewportY>=b.length-term.rows-2;
       term.write(d);
-      if(atBot){ try{term.scrollToBottom();}catch(_){} }
+      if(_pinned){ try{term.scrollToBottom();}catch(_){} }
     } else {
       s.unread=true; renderTabs(); bgNotify(s.name,d);
     }
@@ -894,7 +896,7 @@ function newSession(existToken, existName){
   sock.on('snotice', function(d){
     s.buf += d;
     if(s.buf.length>131072) s.buf=s.buf.slice(-65536);
-    if(activeId===id) term.write(d);
+    if(activeId===id){ term.write(d); if(_pinned){ try{term.scrollToBottom();}catch(_){} } }
     else { s.unread=true; renderTabs(); }
     bgNotify('Share', String(d).replace(/\x1b\[[0-9;]*m/g,'').replace(/\r|\n/g,' ').trim());
   });
@@ -919,6 +921,9 @@ function switchTo(id){
   s.unread=false;
   term.reset();
   if(s.buf) term.write(s.buf);
+  _pinned = true;
+  try{ term.scrollToBottom(); }catch(_){}
+  gobot.classList.remove('show');
   setBadge(s.alive);
   renderTabs();
   setTimeout(function(){
