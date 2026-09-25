@@ -124,6 +124,8 @@ html,body{
   color:transparent;caret-color:transparent;
   -webkit-appearance:none;
   touch-action:pan-y;
+  -webkit-touch-callout:none;
+  -webkit-user-select:none;user-select:none;
 }
 
 /* Scroll-to-bottom pill */
@@ -798,23 +800,46 @@ kb.addEventListener('paste', function(e){
 });
 
 /* Touch on terminal: scroll + left-swipe to open menu */
-var _tx0=0,_ty0=0,_ty1=0,_swp=false,_vel=0;
+var _tx0=0,_ty0=0,_ty1=0,_swp=false,_vel=0,_sacc=0;
+function _lineH(){ return Math.max(10, fontSize*1.2); }
+function _atBotV(){
+  try{
+    var b=term.buffer.active;
+    return b.viewportY >= b.length - term.rows;
+  }catch(_){ return true; }
+}
 kb.addEventListener('touchstart',function(e){
-  _tx0=e.touches[0].clientX; _ty0=_ty1=e.touches[0].clientY; _swp=false;
+  _tx0=e.touches[0].clientX; _ty0=_ty1=e.touches[0].clientY; _swp=false; _sacc=0;
 },{passive:true});
 kb.addEventListener('touchmove',function(e){
   var x=e.touches[0].clientX, y=e.touches[0].clientY;
   var dy=_ty1-y; _ty1=y;
   _vel = dy;
-  if(Math.abs(dy)>0.5) term.scrollLines(Math.round(dy/(fontSize*1.2)));
+  /* fractional accumulation: sub-line drags add up instead of hooking */
+  _sacc += dy;
+  var lh=_lineH();
+  var lines=Math.trunc(_sacc/lh);
+  if(lines){
+    try{ term.scrollLines(lines); }catch(_){}
+    _sacc -= lines*lh;
+    /* scrolling down at/past the bottom: snap exactly so re-pin is clean */
+    if(lines>0 && _atBotV()){ try{ term.scrollToBottom(); }catch(_){} _sacc=0; _vel=0; }
+  }
   if(!_swp && _tx0<32 && x-_tx0>55 && Math.abs(y-_ty0)<70){ _swp=true; openMenu(); }
 },{passive:true});
 kb.addEventListener('touchend',function(){
   var v=_vel; _vel=0;
-  var lh=fontSize*1.2;
+  var lh=_lineH(), fl=0;
   (function mom(){
     if(Math.abs(v)<0.6) return;
-    try{ term.scrollLines(Math.round(v/lh)); }catch(_){ return; }
+    /* momentum also accumulates fractionally — buttery, no dead steps */
+    fl += v;
+    var lines=Math.trunc(fl/lh);
+    if(lines){
+      try{ term.scrollLines(lines); }catch(_){ return; }
+      fl -= lines*lh;
+      if(lines>0 && _atBotV()){ try{ term.scrollToBottom(); }catch(_){} return; }
+    }
     v*=0.92;
     requestAnimationFrame(mom);
   })();
@@ -873,7 +898,7 @@ function newSession(existToken, existName){
   var sock = io({
     transports:['websocket','polling'],
     reconnection:true, reconnectionAttempts:Infinity,
-    reconnectionDelay:1000, reconnectionDelayMax:8000,
+    reconnectionDelay:600, reconnectionDelayMax:5000,
     auth:{ token: existToken||null },
   });
   var s = { id:id, name:name, token:null, sock:sock, alive:false, unread:false, buf:'' };
@@ -903,6 +928,11 @@ function newSession(existToken, existName){
 
   sock.on('connect', function(){
     s.alive=true;
+    clearTimeout(s.offT);
+    /* reconnect = fresh canvas: server replays the whole session buffer,
+       so drop our stale copy first — no duplicated history, no garbage */
+    s.buf='';
+    if(activeId===id){ try{ term.reset(); }catch(_){} }
     if(activeId===id) setBadge(true);
     renderTabs();
     if(activeId===id){
@@ -910,8 +940,18 @@ function newSession(existToken, existName){
     }
     kbFocus();
   });
-  sock.on('connect_error', function(){ if(activeId===id) setBadge(false); });
-  sock.on('disconnect',    function(){ s.alive=false; if(activeId===id) setBadge(false); renderTabs(); });
+  function offlineSoon(){
+    clearTimeout(s.offT);
+    s.offT=setTimeout(function(){
+      if(!s.sock.connected){
+        s.alive=false;
+        if(activeId===id) setBadge(false);
+        renderTabs();
+      }
+    },4000);
+  }
+  sock.on('connect_error', function(){ if(activeId===id) offlineSoon(); });
+  sock.on('disconnect',    function(){ s.alive=false; if(activeId===id) offlineSoon(); renderTabs(); });
 }
 
 function switchTo(id){
@@ -1036,12 +1076,18 @@ function bgNotify(name,raw){
     n.onclick=function(){ window.focus(); n.close(); };
   }catch(_){}
 }
+var _hidAt=0;
 document.addEventListener('visibilitychange',function(){
-  if(!document.hidden){
-    sessions.forEach(function(s){ try{ if(!s.sock.connected) s.sock.connect(); }catch(_){} });
-    var s=getActive(); if(s){s.unread=false; renderTabs();}
-    updateNotifBtn();
-  }
+  if(document.hidden){ _hidAt=Date.now(); return; }
+  var wasLong = _hidAt && (Date.now()-_hidAt>15000);   /* iOS suspended the page — transport may be stale */
+  sessions.forEach(function(s){
+    try{
+      if(!s.sock.connected){ s.sock.connect(); }
+      else if(wasLong && s.sock.io && s.sock.io.engine){ s.sock.io.engine.close(); }  /* force instant re-handshake instead of waiting for a timeout */
+    }catch(_){}
+  });
+  var s=getActive(); if(s){s.unread=false; renderTabs();}
+  updateNotifBtn();
 });
 
 /* ─── Clipboard paste ─── */
