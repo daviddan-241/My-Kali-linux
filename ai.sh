@@ -164,6 +164,9 @@ $O
 
 # THE one command.
 start(){
+  if [ -n "$1" ] && [ -n "${1//[0-9]/}" ]; then
+    printf '\033[31mpins are digits only\033[0m — to just chat: start\n'; return 1
+  fi
   if [ -n "$1" ]; then
     if [ -s "$_AI_PINF" ]; then
       [ "$1" != "$(cat "$_AI_PINF")" ] && { printf '\033[31mwrong pin\033[0m\n'; return 1; }
@@ -204,10 +207,42 @@ start(){
   printf '\033[90mtalk soon.\033[0m\n'
 }
 
-# old names still work — one entrypoint, always was meant to be
-ai(){ start "$@"; }
-aichat(){ start "$@"; }
-aiagent(){ start "$@"; }
+# one entrypoint with real subcommand handling — a stray word can never
+# silently become your PIN again (that was the 'ai setup not working' bug)
+ai(){
+  case "$1" in
+    ""|start|chat|go)
+      [ "$1" = "start" ] && shift
+      start "$@" ;;
+    setup)
+      if [ -z "$2" ]; then
+        printf 'usage: ai setup <your-openrouter-key>\nfree key: https://openrouter.ai/settings/keys\n'; return 1
+      fi
+      printf '%s' "$2" > "$_AI_KEYFILE"; chmod 600 "$_AI_KEYFILE"
+      printf '\033[32m[key saved — works now, but the container wipes it on every deploy]\033[0m\n'
+      printf 'to make it survive redeploys forever: set OPENROUTER_API_KEY in the Render dashboard\n'
+      return 0 ;;
+    models)
+      local M; M=$(_ai_models | head -8)
+      if [ -z "$M" ]; then printf 'could not reach openrouter — check connection\n'; return 1; fi
+      printf '\033[1;37mlive free models right now (auto-ranked, tried in this order):\033[0m\n'
+      printf '%s\n' "$M"
+      printf '\033[90myou can pin one: echo "model-id" > ~/.ai_model\033[0m\n' ;;
+    help|-h|--help)
+      printf '  ai                 open the chat\n'
+      printf '  ai setup <key>     save your openrouter key (free: openrouter.ai/settings/keys)\n'
+      printf '  ai models          list the live free models\n'
+      printf '  ai <4-digits>      set/unlock a pin (optional)\n' ;;
+    *)
+      if [ -n "${1//[0-9]/}" ]; then
+        printf '\033[31munknown: ai %s\033[0m — try: ai · ai setup <key> · ai models · ai help\n' "$1"
+        return 1
+      fi
+      start "$1" ;;
+  esac
+}
+aichat(){ start; }
+aiagent(){ start; }
 
 history(){
   if [ "$1" = "clear" ]; then rm -f "$_AI_HIST"; echo "[history cleared]"; return; fi
