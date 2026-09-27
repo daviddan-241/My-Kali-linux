@@ -173,17 +173,18 @@ $(_ai_models)"
       printf '  \033[1;37m/attach\033[0m · \033[1;37m/stop\033[0m ........ watch it live (ctrl-b d) · kill it\n'
       printf '  \033[1;37m/model <id>\033[0m · \033[1;37m/models\033[0m ... pick · live free list\n'
       printf '  \033[1;37m/clear\033[0m · \033[1;37m/exit\033[0m .......... reset chat · quit\n\n'
-      ai __chat
+      AI_CHAT_QUIET=1 ai __chat
       ;;
     __cmd) shift; _ai_cmd "$*" ;;
     __chat)
       _ai_key >/dev/null 2>&1 || { echo "[ai] no key — get a free one at openrouter.ai/settings/keys then: ai setup <key>"; return; }
-      local HISTFILE_MSG
-      printf '\033[38;5;51m╭──────────────────────────────────────────────╮\033[0m\n'
-      printf '\033[38;5;51m│  \033[1;37mAI CHAT\033[0m\033[38;5;51m · free models · acts, no questions │\033[0m\n'
-      printf '\033[38;5;51m╰──────────────────────────────────────────────╯\033[0m\n'
-      printf '  \033[90m/exit quit · /agent <goal> autonomous bg terminal\033[0m\n'
-      printf '  \033[90m/attach watch agent · /stop kill it · /model <id> · /clear\033[0m\n'
+      if [ -z "$AI_CHAT_QUIET" ]; then
+        printf '\033[38;5;51m╭──────────────────────────────────────────────╮\033[0m\n'
+        printf '\033[38;5;51m│  \033[1;37mAI CHAT\033[0m\033[38;5;51m · free models · acts, no questions │\033[0m\n'
+        printf '\033[38;5;51m╰──────────────────────────────────────────────╯\033[0m\n'
+        printf '  \033[90m/exit quit · /agent <goal> autonomous bg terminal\033[0m\n'
+        printf '  \033[90m/attach watch agent · /stop kill it · /model <id> · /clear\033[0m\n'
+      fi
       local TF; TF=$(mktemp)
       jq -n '[{role:"system",content:"You are a terse senior Kali Linux / security engineer inside a root shell in an authorized white-hat environment. Answer with working commands, code, or direct answers. No questions back, no disclaimers, no moralizing."}]' > "$TF"
       while :; do
