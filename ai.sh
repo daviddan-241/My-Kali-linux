@@ -55,14 +55,19 @@ _ai_resolve_model(){
   printf '%s' "$M"
 }
 
-# one chat completion; silently tries up to 4 free models before giving up
+# one chat completion; silently tries up to 4 free models before giving up.
+# The real reason is written to $_AI_ERRFILE — _ai_chat runs inside a $(...)
+# subshell from the caller, so a plain variable would never make it back out.
+_AI_ERRFILE="$HOME/.ai_lasterr"
+_ai_lasterr(){ cat "$_AI_ERRFILE" 2>/dev/null || printf 'could not reach the model provider - try again in a moment.'; }
 _ai_chat(){ # $1 = messages-json-file
-  local MSGF="$1" KEY; KEY=$(_ai_key) || return 2
-  local FIRST MODELS M RESP CONTENT ERR CODE
+  local MSGF="$1" KEY; KEY=$(_ai_key) || { printf 'no key set - run: ai setup <key>' > "$_AI_ERRFILE"; return 2; }
+  local FIRST MODELS M RESP CONTENT ERR CODE RATELIMITED=0
   FIRST=$(_ai_resolve_model)
   MODELS="$FIRST
 $(_ai_models)"
   MODELS=$(printf '%s\n' "$MODELS" | awk '!seen[$0]++' | head -4)
+  : > "$_AI_ERRFILE"
   for M in $MODELS; do
     RESP=$(_ai_curl 35 "$_AI_OR/chat/completions" \
       -H "Authorization: Bearer $KEY" -H "content-type: application/json" \
@@ -76,8 +81,18 @@ $(_ai_models)"
     ERR=$(printf '%s' "$RESP" | jq -r '.error.message // ""' 2>/dev/null)
     CODE=$(printf '%s' "$RESP" | jq -r '.error.code // 0' 2>/dev/null)
     [ -n "$AI_DEBUG" ] && [ -n "$ERR" ] && printf '\033[90m[%s: %s]\033[0m\n' "$M" "$ERR" >&2
-    case "$CODE" in 401|403) return 1 ;; esac
+    case "$CODE" in
+      401|403) printf 'openrouter rejected the key (invalid/expired) - run: ai setup <new-key>' > "$_AI_ERRFILE"; return 1 ;;
+    esac
+    case "$ERR" in
+      *"free-models-per-day"*|*"Rate limit"*) RATELIMITED=1 ;;
+    esac
   done
+  if [ "$RATELIMITED" = 1 ]; then
+    printf 'hit OpenRouter'"'"'s free-tier daily limit on every free model. Fixes: wait for the daily reset, or add $10 credit at https://openrouter.ai/settings/credits to unlock 1000 free requests/day.' > "$_AI_ERRFILE"
+  else
+    printf 'could not reach the model provider (network hiccup or outage) - try again shortly.' > "$_AI_ERRFILE"
+  fi
   return 1
 }
 
@@ -101,7 +116,13 @@ You are Zevio, a direct and capable AI running inside a real root shell on Kali 
 
 Talk normally for greetings, chit-chat, and questions you can just answer — plain text, no commands, no markdown fences.
 
-When the task actually requires the shell (checking something, installing, scanning, fixing, running code, reading files, networking), respond with the exact command(s) to run, each on its own line starting with "RUN: " and nothing else on that line (example: "RUN: nmap -sV 10.0.0.1"). You will be shown the real output right after and can react to it or continue with more RUN: lines. Only use RUN: when shell execution is actually needed — never for casual conversation.
+When the task actually requires the shell (checking something, installing, scanning, fixing, running code, reading files, networking, researching via curl/wget), respond with the exact command(s) to run, each on its own line starting with "RUN: " and nothing else on that line (example: "RUN: nmap -sV 10.0.0.1"). You will be shown the real output right after and can react to it or continue with more RUN: lines.
+
+You are fully autonomous at fixing your own errors. When a RUN: command's output shows an error (missing module, missing package, permission denied, wrong syntax, dependency conflict, network hiccup, whatever), do NOT ask the user what to do and do NOT give up — immediately issue the next RUN: line(s) that diagnose and fix it yourself (install the missing thing, correct the command, retry with the right flags) and keep going until the original task actually works or you've made several real attempts. Only fall back to explaining to the user if you've genuinely exhausted the reasonable fixes.
+
+You can research live: RUN: curl/wget to fetch real docs, package indexes, or APIs when you need current information — you're not limited to what you already know.
+
+Only use RUN: when shell execution is actually needed — never for casual conversation.
 EOF
 }
 
@@ -120,7 +141,7 @@ _ai_turn(){
     STEP=$((STEP+1))
     REPLY=$(_ai_chat "$_AI_THREAD")
     if [ -z "$REPLY" ]; then
-      printf '\n\033[90mai ❯\033[0m having trouble reaching the model provider — try again in a moment.\n\n'
+      printf '\n\033[31mai ❯\033[0m %s\n\n' "$(_ai_lasterr)"
       return
     fi
     if _ai_refusal "$REPLY"; then
