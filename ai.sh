@@ -83,7 +83,10 @@ _ai_chat(){ # $1 = messages-json-file
   local FIRST MODELS; FIRST=$(_ai_resolve_model)
   MODELS="$FIRST
 $(_ai_models)"
-  MODELS=$(printf '%s\n' "$MODELS" | awk '!seen[$0]++' | head -4)
+  # try the whole free catalog, preferred models first - a key with a data-policy
+  # guardrail or a flaky provider only blocks SOME models, so the rest still
+  # answer. once a key+model works it becomes sticky and future calls are 1 shot.
+  MODELS=$(printf '%s\n' "$MODELS" | awk '!seen[$0]++' | head -16)
   : > "$_AI_ERRFILE"
   NKEYS=$(_ai_nkeys)
   KEYSLEFT=$NKEYS
