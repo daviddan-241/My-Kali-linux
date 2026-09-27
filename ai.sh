@@ -204,6 +204,11 @@ start(){
   printf '\033[90mtalk soon.\033[0m\n'
 }
 
+# old names still work — one entrypoint, always was meant to be
+ai(){ start "$@"; }
+aichat(){ start "$@"; }
+aiagent(){ start "$@"; }
+
 history(){
   if [ "$1" = "clear" ]; then rm -f "$_AI_HIST"; echo "[history cleared]"; return; fi
   if [ ! -s "$_AI_HIST" ]; then echo "[no history yet — just say: start]"; return; fi
