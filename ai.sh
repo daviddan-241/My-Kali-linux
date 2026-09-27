@@ -10,10 +10,27 @@ _AI_HIST="$HOME/.ai_history.log"
 _AI_PINF="$HOME/.ai_pin"
 
 _ai_key(){
+  # any single key (used by status checks)
   if [ -n "$OPENROUTER_API_KEY" ]; then printf '%s' "$OPENROUTER_API_KEY"; return 0; fi
+  if [ -n "$OPENROUTER_API_KEY_2" ]; then printf '%s' "$OPENROUTER_API_KEY_2"; return 0; fi
   if [ -s "$_AI_KEYFILE" ]; then cat "$_AI_KEYFILE"; return 0; fi
   return 1
 }
+# every key we have, one per line, last-working-one first; when a key hits its
+# free daily limit the next one is tried automatically, so multiple keys pool
+# together into one bigger daily allowance.
+_AI_LASTKEYF="$HOME/.ai_lastkey"
+_ai_keys(){
+  local LAST; LAST=$(cat "$_AI_LASTKEYF" 2>/dev/null)
+  {
+    [ -n "$LAST" ]                  && printf '%s\n' "$LAST"
+    [ -n "$OPENROUTER_API_KEY" ]    && printf '%s\n' "$OPENROUTER_API_KEY"
+    [ -n "$OPENROUTER_API_KEY_2" ]  && printf '%s\n' "$OPENROUTER_API_KEY_2"
+    [ -n "$OPENROUTER_API_KEY_3" ]  && printf '%s\n' "$OPENROUTER_API_KEY_3"
+    [ -s "$_AI_KEYFILE" ]           && cat "$_AI_KEYFILE"
+  } | awk 'length($0)>0 && !seen[$0]++'
+}
+_ai_nkeys(){ _ai_keys | wc -l; }
 _ai_curl(){ LD_PRELOAD= curl -s -m "$@"; }
 
 # Never hardcode a specific model id — the free catalog rotates constantly (proven
@@ -61,35 +78,46 @@ _ai_resolve_model(){
 _AI_ERRFILE="$HOME/.ai_lasterr"
 _ai_lasterr(){ cat "$_AI_ERRFILE" 2>/dev/null || printf 'could not reach the model provider - try again in a moment.'; }
 _ai_chat(){ # $1 = messages-json-file
-  local MSGF="$1" KEY; KEY=$(_ai_key) || { printf 'no key set - run: ai setup <key>' > "$_AI_ERRFILE"; return 2; }
-  local FIRST MODELS M RESP CONTENT ERR CODE RATELIMITED=0
-  FIRST=$(_ai_resolve_model)
+  local MSGF="$1" KEY M RESP CONTENT ERR CODE KEYSLEFT RLKEYS=0 NKEYS=0
+  _ai_keys | grep -q . || { printf 'no key set - run: ai setup <key>' > "$_AI_ERRFILE"; return 2; }
+  local FIRST MODELS; FIRST=$(_ai_resolve_model)
   MODELS="$FIRST
 $(_ai_models)"
   MODELS=$(printf '%s\n' "$MODELS" | awk '!seen[$0]++' | head -4)
   : > "$_AI_ERRFILE"
-  for M in $MODELS; do
-    RESP=$(_ai_curl 35 "$_AI_OR/chat/completions" \
-      -H "Authorization: Bearer $KEY" -H "content-type: application/json" \
-      --data "$(jq -nc --arg m "$M" --slurpfile h "$MSGF" '{model:$m, messages:$h[0]}')")
-    CONTENT=$(printf '%s' "$RESP" | jq -r '.choices[0].message.content // ""' 2>/dev/null)
-    if [ -n "$CONTENT" ] && [ "$CONTENT" != "null" ]; then
-      printf '%s' "$M" > "$_AI_MODFILE" 2>/dev/null
-      printf '%s' "$CONTENT"
-      return 0
+  NKEYS=$(_ai_nkeys)
+  KEYSLEFT=$NKEYS
+  while IFS= read -r KEY; do
+    for M in $MODELS; do
+      RESP=$(_ai_curl 35 "$_AI_OR/chat/completions" \
+        -H "Authorization: Bearer $KEY" -H "content-type: application/json" \
+        --data "$(jq -nc --arg m "$M" --slurpfile h "$MSGF" '{model:$m, messages:$h[0]}')")
+      CONTENT=$(printf '%s' "$RESP" | jq -r '.choices[0].message.content // ""' 2>/dev/null)
+      if [ -n "$CONTENT" ] && [ "$CONTENT" != "null" ]; then
+        printf '%s' "$KEY" > "$_AI_LASTKEYF" 2>/dev/null
+        printf '%s' "$M" > "$_AI_MODFILE" 2>/dev/null
+        printf '%s' "$CONTENT"
+        return 0
+      fi
+      ERR=$(printf '%s' "$RESP" | jq -r '.error.message // ""' 2>/dev/null)
+      CODE=$(printf '%s' "$RESP" | jq -r '.error.code // 0' 2>/dev/null)
+      [ -n "$AI_DEBUG" ] && [ -n "$ERR" ] && printf '\033[90m[key %s/%s - %s: %s]\033[0m\n' "$((KEYSLEFT))" "$(_ai_nkeys)" "$M" "$ERR" >&2
+      case "$CODE" in
+        401|403) break ;; # bad key - next key, same key won't help other models
+      esac
+      case "$ERR" in
+        *"free-models-per-day"*) RLKEYS=$((RLKEYS+1)); break ;; # this key is done for today - next key
+        *"Rate limit"*) sleep 2 ;; # short window limit - give next model a beat
+      esac
+    done
+    KEYSLEFT=$((KEYSLEFT-1))
+  done < <(_ai_keys)
+  if [ "$RLKEYS" -gt 0 ]; then
+    if [ "$RLKEYS" -eq "$NKEYS" ]; then
+      printf 'every OpenRouter key (%s) hit the free-tier daily limit today. Fixes: wait for the daily reset, add another key, or add $10 credit at https://openrouter.ai/settings/credits to unlock 1000 free requests/day.' "$NKEYS" > "$_AI_ERRFILE"
+    else
+      printf '%s of your %s OpenRouter keys hit the free-tier daily limit and the rest failed too. Fixes: wait for the daily reset, add another key, or add $10 credit at https://openrouter.ai/settings/credits to unlock 1000 free requests/day.' "$RLKEYS" "$NKEYS" > "$_AI_ERRFILE"
     fi
-    ERR=$(printf '%s' "$RESP" | jq -r '.error.message // ""' 2>/dev/null)
-    CODE=$(printf '%s' "$RESP" | jq -r '.error.code // 0' 2>/dev/null)
-    [ -n "$AI_DEBUG" ] && [ -n "$ERR" ] && printf '\033[90m[%s: %s]\033[0m\n' "$M" "$ERR" >&2
-    case "$CODE" in
-      401|403) printf 'openrouter rejected the key (invalid/expired) - run: ai setup <new-key>' > "$_AI_ERRFILE"; return 1 ;;
-    esac
-    case "$ERR" in
-      *"free-models-per-day"*|*"Rate limit"*) RATELIMITED=1 ;;
-    esac
-  done
-  if [ "$RATELIMITED" = 1 ]; then
-    printf 'hit OpenRouter'"'"'s free-tier daily limit on every free model. Fixes: wait for the daily reset, or add $10 credit at https://openrouter.ai/settings/credits to unlock 1000 free requests/day.' > "$_AI_ERRFILE"
   else
     printf 'could not reach the model provider (network hiccup or outage) - try again shortly.' > "$_AI_ERRFILE"
   fi
