@@ -16,30 +16,34 @@ _ai_key(){
 }
 _ai_curl(){ LD_PRELOAD= curl -s -m "$@"; }
 
-_AI_PREF="
-  cognitivecomputations/dolphin-mistral-24b-venice:free
-  nousresearch/hermes-3-llama-3.1-405b:free
-  qwen/qwen3.8-27b:free
-  z-ai/glm-5.2:free
-  nvidia/nemotron-3-super-120b-a12b:free
-  poolside/laguna-s-2.1:free
-  cohere/north-mini-code:free
-  google/gemma-4-31b-it:free
-  nvidia/nemotron-3-ultra-550b-a55b:free
-"
+# Never hardcode a specific model id — the free catalog rotates constantly (proven
+# twice already: last week's "best picks" are gone this week). Everything here is
+# ranked LIVE against whatever OpenRouter actually serves right now. Cached 10min
+# so we're not refetching the whole catalog on every single message (that was slow).
+_AI_CACHE="$HOME/.ai_models_cache"
 _ai_free_list(){
-  _ai_curl 20 "$_AI_OR/models" | jq -r '[.data[]? | select(.id | endswith(":free")) | .id][]' 2>/dev/null
+  local AGE
+  if [ -f "$_AI_CACHE" ]; then
+    AGE=$(( $(date +%s) - $(stat -c %Y "$_AI_CACHE" 2>/dev/null || echo 0) ))
+    if [ "$AGE" -lt 600 ] && [ -s "$_AI_CACHE" ]; then cat "$_AI_CACHE"; return; fi
+  fi
+  local LIST; LIST=$(_ai_curl 15 "$_AI_OR/models" | jq -r '[.data[]? | select(.id | endswith(":free")) | .id][]' 2>/dev/null)
+  if [ -n "$LIST" ]; then printf '%s\n' "$LIST" > "$_AI_CACHE"; printf '%s\n' "$LIST"; return; fi
+  [ -s "$_AI_CACHE" ] && cat "$_AI_CACHE"
 }
+# Known-good permissive/capable model FAMILIES by name pattern — matched against
+# whatever's actually live, never assumed to exist. Real id always wins over guess.
+_AI_FAMILIES="dolphin venice hermes nemotron-3-ultra nemotron-3-super glm-5 glm-4 qwen3 deepseek gemma-4 llama-4 grok mistral-24b"
 _ai_models(){
-  local LIST P F FOUND
+  local LIST F P FOUND
   LIST=$(_ai_free_list)
-  [ -z "$LIST" ] && { printf '%s\n' deepseek/deepseek-chat-v3-0324:free; return; }
-  for P in $_AI_PREF; do
-    printf '%s\n' "$LIST" | grep -qx -- "$P" && printf '%s\n' "$P"
-  done
+  [ -z "$LIST" ] && return
+  for P in $_AI_FAMILIES; do
+    printf '%s\n' "$LIST" | grep -i -- "$P"
+  done | awk '!seen[$0]++'
   for F in $LIST; do
     FOUND=0
-    for P in $_AI_PREF; do [ "$F" = "$P" ] && FOUND=1; done
+    for P in $_AI_FAMILIES; do printf '%s' "$F" | grep -qi -- "$P" && FOUND=1; done
     [ "$FOUND" = 0 ] && printf '%s\n' "$F"
   done
 }
@@ -60,7 +64,7 @@ _ai_chat(){ # $1 = messages-json-file
 $(_ai_models)"
   MODELS=$(printf '%s\n' "$MODELS" | awk '!seen[$0]++' | head -4)
   for M in $MODELS; do
-    RESP=$(_ai_curl 120 "$_AI_OR/chat/completions" \
+    RESP=$(_ai_curl 35 "$_AI_OR/chat/completions" \
       -H "Authorization: Bearer $KEY" -H "content-type: application/json" \
       --data "$(jq -nc --arg m "$M" --slurpfile h "$MSGF" '{model:$m, messages:$h[0]}')")
     CONTENT=$(printf '%s' "$RESP" | jq -r '.choices[0].message.content // ""' 2>/dev/null)
