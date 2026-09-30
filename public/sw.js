@@ -1,7 +1,7 @@
 /* KaliTerm service worker — real installable app experience.
    Network-first for the shell (never stale when online), cache fallback offline. */
-var CACHE = 'kaliterm-v3';
-var SHELL = ['./', 'index.html', 'manifest.webmanifest', 'icon-192.png', 'icon-512.png', 'icon-180.png', 'icon.png', 'kali-bg.jpeg'];
+var CACHE = 'kaliterm-v4';
+var SHELL = ['./', 'index.html', 'app.js', 'app.css', 'manifest.webmanifest', 'icon-192.png', 'icon-512.png', 'icon-180.png', 'icon.png', 'kali-bg.jpeg'];
 
 self.addEventListener('install', function (e) {
   e.waitUntil(
