@@ -191,14 +191,16 @@ html,body{
 
 /* ─── Key bar ─── */
 #keybar{
-  display:flex;align-items:stretch;gap:4px;
-  height:56px;flex-shrink:0;
+  display:flex;flex-direction:column;gap:4px;
+  flex-shrink:0;
   padding:6px 6px max(6px, env(safe-area-inset-bottom, 6px));
   background:rgba(14,16,19,0.95);
   -webkit-backdrop-filter:saturate(180%) blur(20px);
   backdrop-filter:saturate(180%) blur(20px);
   border-top:0.5px solid rgba(255,255,255,0.08);
 }
+/* authentic Termux extra-keys: two even rows of equal-width keys */
+.trow{display:flex;gap:4px;height:38px;}
 .k{
   flex:1;min-width:0;
   display:flex;align-items:center;justify-content:center;
@@ -215,8 +217,7 @@ html,body{
 .k.mod{color:#9ecbff;background:rgba(94,158,255,0.10);}
 .k.mod.on{background:rgba(94,158,255,0.28);color:#e8f2ff;box-shadow:0 0 0 1px rgba(94,158,255,0.45) inset;}
 .k.flash{background:rgba(255,255,255,0.18);color:#fff;}
-#ksend{flex:1.35;background:#32d74b;color:#06280f;font-weight:800;font-size:12px;letter-spacing:.4px;}
-#ksend:active,#ksend.flash{background:#45e357;transform:scale(0.96);}
+
 
 /* ─── In-app browser ─── */
 #bwrap{
@@ -498,25 +499,31 @@ html,body{
       <div class="xk tool" data-k="cd">^D</div>
       <div class="xk tool" data-k="cl">^L</div>
       <div class="xk tool" data-k="cu">^U</div>
-      <div class="xk tool" data-k="home">HOME</div>
-      <div class="xk tool" data-k="end">END</div>
-      <div class="xk tool" data-k="pgup">PGUP</div>
-      <div class="xk tool" data-k="pgdn">PGDN</div>
+      <div class="xk tool" id="xpaste">PASTE</div>
+      <div class="xk tool" id="xsend">SEND</div>
     </div>
   </div>
 
   <!-- Key bar -->
   <div id="keybar">
-    <div class="k mod" id="kctrl">CTL</div>
-    <div class="k mod" id="kalt">ALT</div>
-    <div class="k"     id="kesc">ESC</div>
-    <div class="k"     id="ktab">TAB</div>
-    <div class="k"     id="kleft">&#x25C4;</div>
-    <div class="k"     id="kdown">&#x25BC;</div>
-    <div class="k"     id="kup">&#x25B2;</div>
-    <div class="k"     id="kright">&#x25BA;</div>
-    <div class="k"     id="kpaste">&#9112;</div>
-    <div class="k"     id="ksend">&#8629;&#160;SEND</div>
+    <div class="trow">
+      <div class="k" id="kesc">ESC</div>
+      <div class="k" id="kslash">/</div>
+      <div class="k" id="kdash">-</div>
+      <div class="k" id="khome">HOME</div>
+      <div class="k" id="kup">&#x25B2;</div>
+      <div class="k" id="kend">END</div>
+      <div class="k" id="kpgup">PGUP</div>
+    </div>
+    <div class="trow">
+      <div class="k" id="ktab">TAB</div>
+      <div class="k mod" id="kctrl">CTRL</div>
+      <div class="k mod" id="kalt">ALT</div>
+      <div class="k" id="kleft">&#x25C0;</div>
+      <div class="k" id="kdown">&#x25BC;</div>
+      <div class="k" id="kright">&#x25B6;</div>
+      <div class="k" id="kpgdn">PGDN</div>
+    </div>
   </div>
 </div>
 
@@ -1139,8 +1146,8 @@ quickTap(document.getElementById('psend'), function(){
   closePasteSheet();
   sendPaste(t);
 });
-quickTap(document.getElementById('kpaste'), function(){ tryClipboardRead(); });
-keyBtn('ksend',  function(){ pushHist(pendLine); send('\r'); kbFocus(); });
+quickTap(document.getElementById('xpaste'), function(){ tryClipboardRead(); });
+keyBtn('xsend',  function(){ pushHist(pendLine); send('\r'); kbFocus(); });
 
 /* ─── In-app browser ─── */
 function openBrowser(url){
@@ -1211,7 +1218,7 @@ function wireXk(el){
   el.addEventListener('touchstart', fire, {passive:false});
   el.addEventListener('mousedown', fire, false);
 }
-document.querySelectorAll('.xk').forEach(wireXk);
+document.querySelectorAll('.xk[data-v], .xk[data-k]').forEach(wireXk);
 
 /* ─── Menu: paste + copy actions ─── */
 quickTap(document.getElementById('mpaste'), function(){ closeSettings(); tryClipboardRead(); });
@@ -1227,15 +1234,21 @@ quickTap(document.getElementById('mcopy'), function(){
 });
 
 /* ─── Keybar buttons (fire on touchstart for zero delay) ─── */
-keyBtn('kctrl', function(){ setCtrl(!ctrlOn); kbFocus(); });
-keyBtn('kalt',  function(){ setAlt(!altOn);   kbFocus(); });
-keyBtn('kesc',  function(){ send('\x1b');      kbFocus(); });
-keyBtn('ktab',  function(){ send('\t');        kbFocus(); });
-keyBtn('kup',   function(){ send('\x1b[A');    kbFocus(); });
-keyBtn('kdown', function(){ send('\x1b[B');    kbFocus(); });
-keyBtn('kleft', function(){ send('\x1b[D');    kbFocus(); });
-keyBtn('kright',function(){ send('\x1b[C');    kbFocus(); });
-/* | and - moved into the expandable keyboard rows */
+keyBtn('kctrl',  function(){ setCtrl(!ctrlOn); kbFocus(); });
+keyBtn('kalt',   function(){ setAlt(!altOn);   kbFocus(); });
+keyBtn('kesc',   function(){ send('\x1b');      kbFocus(); });
+keyBtn('kslash',  function(){ send('/');         kbFocus(); });
+keyBtn('kdash',   function(){ send('-');         kbFocus(); });
+keyBtn('khome',  function(){ send('\x1b[H');    kbFocus(); });
+keyBtn('kend',   function(){ send('\x1b[F');    kbFocus(); });
+keyBtn('kpgup',  function(){ send('\x1b[5~');   kbFocus(); });
+keyBtn('kpgdn',  function(){ send('\x1b[6~');   kbFocus(); });
+keyBtn('ktab',   function(){ send('\t');        kbFocus(); });
+keyBtn('kup',    function(){ send('\x1b[A');    kbFocus(); });
+keyBtn('kdown',  function(){ send('\x1b[B');    kbFocus(); });
+keyBtn('kleft',  function(){ send('\x1b[D');    kbFocus(); });
+keyBtn('kright', function(){ send('\x1b[C');    kbFocus(); });
+/* PASTE/SEND moved up into the expandable rail tool row */
 
 /* ─── Boot ─── */
 if(saved.length){
