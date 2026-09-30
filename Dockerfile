@@ -30,7 +30,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 # ── 3. Web application testing ────────────────────────────────────────────────
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    gobuster dirb nikto wfuzz whatweb wafw00f sqlmap ffuf sslscan \
+    gobuster dirsearch dirb nikto wfuzz whatweb wafw00f sqlmap ffuf sslscan \
     && rm -rf /var/lib/apt/lists/*
 
 # ── 4. Password attacks ───────────────────────────────────────────────────────
