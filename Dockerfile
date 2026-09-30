@@ -56,7 +56,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 # ── 8. Forensics & reverse engineering ───────────────────────────────────────
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    binwalk foremost steghide libimage-exiftool-perl ltrace gdb \
+    binwalk foremost steghide libimage-exiftool-perl ltrace gdb ffmpeg imagemagick \
     && rm -rf /var/lib/apt/lists/*
 
 # ── 9. OSINT / misc ───────────────────────────────────────────────────────────

@@ -7,6 +7,7 @@ const path     = require("path");
 const fs       = require("fs");
 const os       = require("os");
 const crypto   = require("crypto");
+const busboy   = require("busboy");
 
 const app    = express();
 const server = http.createServer(app);
@@ -111,6 +112,11 @@ fs.chmodSync(INIT_FILE, 0o755);
 const IDLE_MS  = 24 * 60 * 60 * 1000;  // 24h idle → kill PTY (survive backgrounding)
 const BUF_MAX  = 131072;            // 128 KB replay buffer per session
 const sessions = new Map();
+
+
+/* ── Ensure /root/uploads exists ── */
+const UPLOAD_DIR = "/root/uploads";
+try { fs.mkdirSync(UPLOAD_DIR, { recursive: true }); } catch (_) {}
 
 /* API key */
 const API_KEY = process.env.TERMINAL_API_KEY || crypto.randomBytes(20).toString("hex");
@@ -240,6 +246,198 @@ io.on("connection", socket => {
 });
 
 /* ── REST API ─────────────────────────────────────────────────────────────── */
+
+function isAuthValid(req) {
+  const token = req.headers["x-api-key"] ||
+                req.headers["x-terminal-api-key"] ||
+                (req.headers["authorization"] ? req.headers["authorization"].replace(/^Bearer\s+/i, "") : null) ||
+                req.query.api_key ||
+                req.query.token;
+
+  if (!process.env.TERMINAL_API_KEY) return true;
+  if (token === API_KEY) return true;
+  if (token && sessions.has(token)) return true;
+  return false;
+}
+
+/* POST /upload — stream file upload to /root/uploads (200MB max) */
+app.post("/upload", (req, res) => {
+  if (!isAuthValid(req)) {
+    return res.status(401).json({ ok: false, error: "Unauthorized" });
+  }
+
+  const MAX_SIZE = 200 * 1024 * 1024; // 200MB limit
+  const contentLength = parseInt(req.headers["content-length"] || "0", 10);
+  if (contentLength > MAX_SIZE) {
+    return res.status(413).json({ ok: false, error: "File exceeds 200MB limit" });
+  }
+
+  try {
+    fs.mkdirSync(UPLOAD_DIR, { recursive: true });
+  } catch (_) {}
+
+  const contentType = req.headers["content-type"] || "";
+
+  if (contentType.includes("multipart/form-data")) {
+    let bb;
+    try {
+      bb = busboy({ headers: req.headers, limits: { fileSize: MAX_SIZE } });
+    } catch (err) {
+      return res.status(400).json({ ok: false, error: err.message || "Invalid upload request" });
+    }
+
+    let savedFilename = "";
+    let fileBytes = 0;
+    let limitExceeded = false;
+    let fileSaved = false;
+
+    const writePromises = [];
+
+    bb.on("file", (fieldname, fileStream, info) => {
+      const { filename } = info;
+      const rawName = filename || `upload_${Date.now()}`;
+      const safeName = path.basename(rawName).replace(/[^a-zA-Z0-9_.-]/g, "_");
+      savedFilename = safeName;
+      const savePath = path.join(UPLOAD_DIR, safeName);
+      const writeStream = fs.createWriteStream(savePath);
+
+      const p = new Promise((resolve) => {
+        fileStream.on("data", (data) => {
+          fileBytes += data.length;
+          if (fileBytes > MAX_SIZE) {
+            limitExceeded = true;
+            fileStream.resume();
+            writeStream.destroy();
+            try { fs.unlinkSync(savePath); } catch (_) {}
+          }
+        });
+
+        fileStream.on("limit", () => {
+          limitExceeded = true;
+          writeStream.destroy();
+          try { fs.unlinkSync(savePath); } catch (_) {}
+        });
+
+        fileStream.pipe(writeStream);
+
+        writeStream.on("finish", () => {
+          resolve();
+        });
+
+        writeStream.on("error", () => {
+          limitExceeded = true;
+          try { fs.unlinkSync(savePath); } catch (_) {}
+          resolve();
+        });
+      });
+
+      writePromises.push(p);
+    });
+
+    bb.on("error", (err) => {
+      if (!res.headersSent) {
+        res.status(400).json({ ok: false, error: err.message || "Upload error" });
+      }
+    });
+
+    bb.on("close", async () => {
+      if (res.headersSent) return;
+      await Promise.all(writePromises);
+      if (limitExceeded) {
+        return res.status(413).json({ ok: false, error: "File exceeds 200MB limit" });
+      }
+      if (!savedFilename) {
+        return res.status(400).json({ ok: false, error: "No file uploaded" });
+      }
+      return res.json({
+        ok: true,
+        name: savedFilename,
+        filename: savedFilename,
+        path: `/root/uploads/${savedFilename}`,
+        size: fileBytes,
+        message: `saved to /root/uploads/${savedFilename} — AI and tools can read it`
+      });
+    });
+
+    req.pipe(bb);
+  } else {
+    // Raw binary stream upload
+    const rawName = req.query.filename || req.headers["x-filename"] || `upload_${Date.now()}`;
+    const safeName = path.basename(rawName).replace(/[^a-zA-Z0-9_.-]/g, "_");
+    const savePath = path.join(UPLOAD_DIR, safeName);
+    const writeStream = fs.createWriteStream(savePath);
+    let fileBytes = 0;
+    let limitExceeded = false;
+
+    req.on("data", (chunk) => {
+      fileBytes += chunk.length;
+      if (fileBytes > MAX_SIZE) {
+        limitExceeded = true;
+        req.destroy();
+        writeStream.destroy();
+        try { fs.unlinkSync(savePath); } catch (_) {}
+        if (!res.headersSent) {
+          return res.status(413).json({ ok: false, error: "File exceeds 200MB limit" });
+        }
+      }
+    });
+
+    req.pipe(writeStream);
+
+    writeStream.on("finish", () => {
+      if (res.headersSent) return;
+      if (limitExceeded) {
+        return res.status(413).json({ ok: false, error: "File exceeds 200MB limit" });
+      }
+      return res.json({
+        ok: true,
+        name: safeName,
+        filename: safeName,
+        path: `/root/uploads/${safeName}`,
+        size: fileBytes,
+        message: `saved to /root/uploads/${safeName} — AI and tools can read it`
+      });
+    });
+
+    writeStream.on("error", (err) => {
+      if (!res.headersSent) {
+        return res.status(500).json({ ok: false, error: err.message || "Failed to save file" });
+      }
+    });
+  }
+});
+
+/* GET /uploads — list uploaded files in /root/uploads */
+app.get("/uploads", (req, res) => {
+  if (!isAuthValid(req)) {
+    return res.status(401).json({ ok: false, error: "Unauthorized" });
+  }
+
+  try {
+    if (!fs.existsSync(UPLOAD_DIR)) {
+      return res.json({ ok: true, files: [] });
+    }
+    const entries = fs.readdirSync(UPLOAD_DIR);
+    const files = [];
+    for (const name of entries) {
+      try {
+        const filePath = path.join(UPLOAD_DIR, name);
+        const stat = fs.statSync(filePath);
+        if (stat.isFile()) {
+          files.push({
+            name,
+            size: stat.size,
+            date: stat.mtime.toISOString(),
+          });
+        }
+      } catch (_) {}
+    }
+    return res.json({ ok: true, files });
+  } catch (err) {
+    return res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
 function requireApiKey(req, res, next) {
   const key = req.headers["x-api-key"] || req.query.api_key;
   if (key !== API_KEY) {

@@ -80,15 +80,153 @@ _ai_resolve_model(){
 _AI_ERRFILE="$HOME/.ai_lasterr"
 _ai_lasterr(){ cat "$_AI_ERRFILE" 2>/dev/null || printf 'could not reach the model provider - try again in a moment.'; }
 _AI_ERRRAW="$HOME/.ai_errraw"
+
+_AI_VISION_CACHE="$HOME/.ai_vmodels_cache"
+_ai_free_vision_list(){
+  local AGE
+  if [ -f "$_AI_VISION_CACHE" ]; then
+    AGE=$(( $(date +%s) - $(stat -c %Y "$_AI_VISION_CACHE" 2>/dev/null || echo 0) ))
+    if [ "$AGE" -lt 600 ] && [ -s "$_AI_VISION_CACHE" ]; then cat "$_AI_VISION_CACHE"; return; fi
+  fi
+  local JSON; JSON=$(_ai_curl 15 "$_AI_OR/models" 2>/dev/null)
+  if [ -n "$JSON" ]; then
+    local VMODELS
+    VMODELS=$(printf '%s' "$JSON" | jq -r '[.data[]? | select(.id | endswith(":free")) | select((.id | test("vision|vl|qwen-2-vl|llama-3.2-vision|multimodal"; "i")) or ((.architecture.modality? // "") | test("image"; "i"))) | .id][]' 2>/dev/null)
+    if [ -n "$VMODELS" ]; then
+      printf '%s\n' "$VMODELS" > "$_AI_VISION_CACHE"
+      printf '%s\n' "$VMODELS"
+      return
+    fi
+  fi
+  [ -s "$_AI_VISION_CACHE" ] && cat "$_AI_VISION_CACHE"
+}
+
+_ai_vision_models(){
+  local LIST; LIST=$(_ai_free_vision_list)
+  if [ -z "$LIST" ]; then
+    LIST="qwen/qwen-2-vl-72b-instruct:free
+meta-llama/llama-3.2-11b-vision-instruct:free
+meta-llama/llama-3.2-90b-vision-instruct:free
+qwen/qwen-vl-plus:free"
+  fi
+  local FAMILIES="qwen2-vl qwen-vl llama-3.2-vision vision vl"
+  local P F
+  for P in $FAMILIES; do
+    printf '%s\n' "$LIST" | grep -i -- "$P"
+  done | awk '!seen[$0]++'
+  for F in $LIST; do
+    local FOUND=0
+    for P in $FAMILIES; do printf '%s' "$F" | grep -qi -- "$P" && FOUND=1; done
+    [ "$FOUND" = 0 ] && printf '%s\n' "$F"
+  done | awk '!seen[$0]++'
+}
+
+_ai_vision(){
+  local FILE="$1"
+  local PROMPT="${2:-Describe this media in detail and highlight anything notable.}"
+
+  if [ -z "$FILE" ]; then
+    printf '\033[31merror: missing file path — usage: ai -i <path-to-image-or-video> "question"\033[0m\n' >&2
+    return 1
+  fi
+
+  if [ ! -f "$FILE" ]; then
+    printf '\033[31merror: file "%s" not found\033[0m\n' "$FILE" >&2
+    return 1
+  fi
+
+  local SIZE_BYTES; SIZE_BYTES=$(stat -c %s "$FILE" 2>/dev/null || wc -c < "$FILE")
+  if [ "$SIZE_BYTES" -gt 20971520 ]; then
+    printf '\033[31merror: file "%s" is too big (%s MB) — max allowed size is 20MB\033[0m\n' "$FILE" "$((SIZE_BYTES/1048576))" >&2
+    return 1
+  fi
+
+  local EXT; EXT=$(printf '%s' "${FILE##*.}" | tr '[:upper:]' '[:lower:]')
+  local MEDIA_TYPE=""
+  case "$EXT" in
+    jpg|jpeg|png|gif|webp) MEDIA_TYPE="image" ;;
+    mp4|webm|mov) MEDIA_TYPE="video" ;;
+    *)
+      printf '\033[31merror: unsupported file type ".%s" — expected jpg, png, gif, webp, mp4, webm, mov\033[0m\n' "$EXT" >&2
+      return 1
+      ;;
+  esac
+
+  local MSGF; MSGF=$(mktemp)
+
+  if [ "$MEDIA_TYPE" = "image" ]; then
+    local MIME="image/png"
+    case "$EXT" in
+      jpg|jpeg) MIME="image/jpeg" ;;
+      gif) MIME="image/gif" ;;
+      webp) MIME="image/webp" ;;
+    esac
+
+    local B64; B64=$(base64 -w0 "$FILE" 2>/dev/null || base64 "$FILE" | tr -d '\r\n')
+    local DATA_URL="data:${MIME};base64,${B64}"
+
+    jq -n --arg prompt "$PROMPT" --arg url "$DATA_URL" \
+      '[{role: "user", content: [{type: "text", text: $prompt}, {type: "image_url", image_url: {url: $url}}]}]' > "$MSGF"
+  else
+    mkdir -p /tmp/vframes && rm -f /tmp/vframes/*
+    local DURATION; DURATION=$(ffprobe -v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 "$FILE" 2>/dev/null)
+    if [ -z "$DURATION" ] || [ "$(printf '%.0f' "$DURATION" 2>/dev/null || echo 0)" -eq 0 ]; then
+      DURATION=5
+    fi
+
+    local FRAMES_JSON="[]"
+    local i PCT TS B64 DATA_URL LABEL
+    local PCTS=(0 25 50 75 95)
+    for i in 0 1 2 3 4; do
+      PCT=${PCTS[$i]}
+      TS=$(node -e "console.log((${DURATION} * ${PCT} / 100).toFixed(2))" 2>/dev/null || echo 0)
+      ffmpeg -ss "$TS" -i "$FILE" -vframes 1 -q:v 2 "/tmp/vframes/frame_${i}.jpg" -y >/dev/null 2>&1
+      if [ -f "/tmp/vframes/frame_${i}.jpg" ]; then
+        B64=$(base64 -w0 "/tmp/vframes/frame_${i}.jpg" 2>/dev/null || base64 "/tmp/vframes/frame_${i}.jpg" | tr -d '\r\n')
+        DATA_URL="data:image/jpeg;base64,${B64}"
+        LABEL="frame $((i+1))/5 at ${PCT}%"
+        FRAMES_JSON=$(jq -nc --argjson cur "$FRAMES_JSON" --arg label "$LABEL" --arg url "$DATA_URL" \
+          '$cur + [{type: "text", text: ("(" + $label + ")")}, {type: "image_url", image_url: {url: $url}}]')
+      fi
+    done
+
+    jq -n --arg prompt "$PROMPT" --argjson frames "$FRAMES_JSON" \
+      '[{role: "user", content: ([{type: "text", text: $prompt}] + $frames)}]' > "$MSGF"
+  fi
+
+  local VMODELS; VMODELS=$(_ai_vision_models)
+  if [ -z "$VMODELS" ]; then
+    printf '\033[31merror: no vision model available on OpenRouter\033[0m\n' >&2
+    rm -f "$MSGF"
+    return 1
+  fi
+
+  printf '\033[1;97m╭───────╮\033[0m\n'
+  printf '\033[1;97m│ codex │\033[0m \033[90mvision\033[0m\n'
+  printf '\033[1;97m╰───────╯\033[0m\n'
+  printf '\033[90m %s · streaming · free-tier\033[0m\n\n' "$(printf '%s' "$VMODELS" | head -1)"
+
+  VISION_MODELS="$VMODELS" _ai_chat "$MSGF"
+  local RET=$?
+  rm -f "$MSGF"
+  printf '\n'
+  return $RET
+}
+
 _ai_chat(){ # $1 = messages-json-file, $2(optional) = file that also receives the full reply while it streams
   local MSGF="$1" OUTF="${2:-}" KEY M LINE DELTA ERR CODE KEYSLEFT RLKEYS=0 NKEYS=0 GOTANY=0
   _ai_keys | grep -q . || { printf 'no key set - run: ai setup <key>' > "$_AI_ERRFILE"; return 2; }
   local LOCALOUTF=0
   if [ -z "$OUTF" ]; then OUTF=$(mktemp); LOCALOUTF=1; fi
   : > "$OUTF"
-  local FIRST MODELS; FIRST=$(_ai_resolve_model)
-  MODELS="$FIRST
+  local FIRST MODELS
+  if [ -n "${VISION_MODELS:-}" ]; then
+    MODELS="$VISION_MODELS"
+  else
+    FIRST=$(_ai_resolve_model)
+    MODELS="$FIRST
 $(_ai_models)"
+  fi
   # try the whole free catalog, preferred models first - a key with a data-policy
   # guardrail or a flaky provider only blocks SOME models, so the rest still
   # answer. once a key+model works it becomes sticky and future calls are 1 shot.
@@ -294,6 +432,14 @@ start(){
 # silently become your PIN again (that was the 'ai setup not working' bug)
 ai(){
   case "$1" in
+    -i|--image|--media)
+      shift
+      local VFILE="$1"
+      [ -n "$1" ] && shift
+      local VPROMPT="$*"
+      _ai_vision "$VFILE" "$VPROMPT"
+      return $?
+      ;;
     ""|start|chat|go)
       [ "$1" = "start" ] && shift
       start "$@" ;;

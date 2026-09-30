@@ -513,7 +513,7 @@ export default function App() {
         altOn={altOn}
         setCtrl={handleSetCtrl}
         setAlt={handleSetAlt}
-        onSendInput={sendToActive}
+        onSendInput={handleSendInput}
         onOpenMenu={() => setIsMenuOpen(true)}
         onToggleRail={() => setIsRailOpen((prev) => !prev)}
         isRailOpen={isRailOpen}
@@ -590,6 +590,13 @@ export default function App() {
         }}
       />
 
+      <input
+        type="file"
+        ref={fileInputRef}
+        accept="video/*,image/*,*"
+        style={{ display: none }}
+        onChange={handleFileChange}
+      />
       <Toast message={toastMsg} />
     </div>
   );
